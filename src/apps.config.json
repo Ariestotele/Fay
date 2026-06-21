@@ -17,14 +17,14 @@
       "name": "Game",
       "glyph": "◈",
       "target": "%USERPROFILE%\\Desktop\\Fay-Game.lnk",
-      "hint": "Game on the ASUS main · Steam + Discord + LifeOS on the side screen"
+      "hint": "Game on the ASUS main · side screen quartered: Discord, Task Manager, Zen, LifeOS"
     },
     {
       "id": "side",
       "name": "Side Stack",
       "glyph": "⊞",
       "target": "%USERPROFILE%\\Desktop\\Fay-Side.lnk",
-      "hint": "Side screen only: quarter Zen, Discord, Task Manager, Steam/LifeOS"
+      "hint": "Side screen only: quarter Discord, Task Manager, Zen, LifeOS"
     }
   ],
   "apps": [

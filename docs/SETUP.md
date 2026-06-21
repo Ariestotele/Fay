@@ -122,8 +122,8 @@ one-time check because paths are install-specific (see the `hint` on each tile):
 | Tile | Build this workspace |
 |------|----------------------|
 | **Focus** | Zen maximized on the ASUS main screen; Discord + Task Manager + LifeOS quartered on the side screen. |
-| **Game** | Leave the main screen for your game; put Steam + Discord + LifeOS on the side screen. |
-| **Side Stack** | Side screen only — quarter Zen, Discord, Task Manager, Steam/LifeOS. |
+| **Game** | Leave the ASUS main screen for your game; side screen quartered with Discord (top-left), Task Manager (top-right), Zen (bottom-left), LifeOS (bottom-right). |
+| **Side Stack** | Side screen only — quarter Discord, Task Manager, Zen, LifeOS. |
 
 For each: open the Workspaces editor, arrange the windows, **Save**, then
 **Create desktop shortcut**. Rename the shortcut to match the config
