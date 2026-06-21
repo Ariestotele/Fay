@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  # Fast checks: config + frontend are valid.
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON
+        run: |
+          python3 - <<'PY'
+          import json
+          files = [
+              "src/apps.config.json",
+              "src-tauri/tauri.conf.json",
+              "src-tauri/capabilities/default.json",
+              "package.json",
+          ]
+          for f in files:
+              json.load(open(f))
+              print("ok:", f)
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check frontend JS syntax
+        run: node -c src/app.js
+
+  # Real build verification: compile the Tauri app on Windows.
+  build-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - name: cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked || cargo check --manifest-path src-tauri/Cargo.toml

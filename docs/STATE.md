@@ -17,19 +17,24 @@
   - Real icons generated (`src-tauri/icons/`) so tray + bundling work.
   - Elevated tiles show an `ADMIN` badge in the UI.
 
-## ⚠️ Needs verifying (couldn't build in the Linux dev container)
+## ⚙️ CI (added 2026-06-21)
 
-Phase 1 is written but **not yet compiled** — the dev container is Linux and
-can't build a Windows Tauri app. On a Windows machine:
+`.github/workflows/ci.yml` runs on every push/PR:
 
-1. `npm install && npm run dev` — confirm the window opens.
-2. Confirm tray icon appears and Ctrl+Alt+Space toggles the window.
-3. Confirm an `elevated` tile raises a UAC prompt.
-4. Confirm the footer shows your real monitor count.
+- **config** (Ubuntu) — validates the JSON files + frontend JS syntax.
+- **build-check** (Windows) — `cargo check` actually compiles the Tauri app, so
+  the Rust/tray/global-shortcut code is verified automatically (no manual
+  Windows machine needed). Runtime checks (tray appears, UAC prompt, hotkey)
+  still need a real interactive session — see below.
 
-If the Tauri v2 tray/global-shortcut API has drifted, the two spots to check are
-the `.setup(...)` tray block and the `tauri_plugin_global_shortcut` calls in
-`main.rs`.
+## ⚠️ Needs verifying (interactive, can't be done in CI)
+
+CI compiles the app, but these are runtime behaviors to confirm on Windows:
+
+1. `npm install && npm run dev` — window opens.
+2. Tray icon appears and Ctrl+Alt+Space toggles the window.
+3. An `elevated` tile raises a UAC prompt.
+4. The footer shows your real monitor count.
 
 ## 🔜 Next (Phase 2)
 
