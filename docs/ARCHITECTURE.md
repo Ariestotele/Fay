@@ -37,7 +37,17 @@ launch(target, elevated)  // un-elevated: cmd /C start "" <target>
                           // elevated:    powershell Start-Process -Verb RunAs
 list_monitors()           // current display layout (for the footer readout)
 hide_window()             // Escape-to-hide
+set_audio_output(device)  // set default playback device (Console+Multimedia roles)
 ```
+
+### Scene audio output (optional)
+
+A scene (or app) tile may carry an `audioOut` field naming a playback device.
+When clicked, Fay calls `set_audio_output` *before* launching the layout. It sets
+the **Console + Multimedia** default roles only and leaves **Communications**
+alone — so games/media move to the chosen device while Discord (which uses its
+own pinned device, or the Communications default) is untouched. This relies on
+NirSoft `SoundVolumeView.exe` since Windows ships no CLI for it (see SETUP.md).
 
 `launch` handles `.exe`, plain commands on PATH (`code`, `spotify`), `.lnk`
 files, and URLs uniformly. `elevated: true` tiles raise a UAC prompt so admin

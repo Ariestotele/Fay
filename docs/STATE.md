@@ -3,7 +3,8 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-06-21
-**Current phase:** Phase 2 in progress — Phase 1 merged to `main` (CI green)
+**Current phase:** Phase 1 + 2 merged. Phase 3 (scene `audioOut`) in PR. Awaiting
+owner's Windows runtime check + PowerToys Workspace creation.
 
 ## ✅ Done
 
@@ -36,28 +37,38 @@ CI compiles the app, but these are runtime behaviors to confirm on Windows:
 3. An `elevated` tile raises a UAC prompt.
 4. The footer shows your real monitor count.
 
-## ✅ Phase 2 (in progress)
+## ✅ Phase 2 (merged — PR #2)
 
 - UI polish: staggered tile entrance, arrow-key nav, focus-visible ring.
 - Real deck wired into `apps.config.json`: apps (Zen, Discord, Claude, LifeOS,
   Phone Link, Steam, Task Manager) + scenes (Focus, Game, Side Stack).
+- Game/Side scenes match the owner's actual side-screen layout (quartered
+  Discord + Task Manager + Zen + LifeOS, game on the ASUS main).
 - SETUP.md documents which tiles work out of the box vs. need a path check, and
   how to build each scene's PowerToys Workspace.
 
-## 🔜 Phase 2 remaining / next
+## 📌 Pending — owner tasks (can't be automated)
 
-- **User action:** verify the exe paths for Zen / Claude / LifeOS, and create the
-  three PowerToys Workspace shortcuts (Fay-Focus/Game/Side.lnk). See SETUP.md.
-- Optional: make the summon hotkey configurable from `apps.config.json`.
-- Deferred: Ctrl+Mouse5 summon (needs a low-level mouse hook — see DECISIONS.md).
+- [ ] Verify the exe paths for **Zen / Claude / LifeOS** in `src/apps.config.json`.
+- [ ] Create the three **PowerToys Workspaces** + desktop shortcuts
+      (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`). See SETUP.md.
+- [ ] Run the interactive **Windows smoke test** (window opens, tray,
+      Ctrl+Alt+Space toggle, a UAC tile, footer monitor count).
+- [ ] Install **SoundVolumeView.exe** (PATH or beside Fay) for scene `audioOut`,
+      and confirm the **Game** scene flips audio to the headset without moving Discord.
 
-## 🧭 Later (Phases 3–4)
+## ✅ Phase 3 (in PR) — scene audio output
 
+- Scenes can set the default playback device via `audioOut` (Console+Multimedia
+  roles only, so Discord/Communications is untouched). Backend
+  `set_audio_output` shells to NirSoft SoundVolumeView. Wired into scene clicks.
+- Game scene set to switch audio to the Hyper X headset.
+
+## 🧭 Later
+
+- **Ctrl+Mouse5 summon** — requested; needs a low-level Windows mouse hook
+  (WH_MOUSE_LL), separate from the keyboard-only global-shortcut plugin. Own phase.
+- Make the summon hotkey configurable from `apps.config.json`.
 - Search + categories once tiles exceed ~20.
 - `machine`/profile key so paths differ per computer.
 - Autostart on boot.
-
-## ⚠️ Open questions for the user
-
-- Which real apps/scenes do you want as the starting set?
-- Keep summon hotkey at Ctrl+Alt+Space, or change it?

@@ -130,6 +130,32 @@ For each: open the Workspaces editor, arrange the windows, **Save**, then
 (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`) or edit the tile `target` to
 whatever PowerToys named it.
 
+## Switching audio output per scene
+
+A scene can change your **default playback device** when you click it — e.g. the
+**Game** scene flips audio to your headset. Discord is left alone (see below).
+
+Windows has no built-in command to set the default device, so Fay shells out to
+**NirSoft SoundVolumeView** (free, portable):
+
+1. Download SoundVolumeView from https://www.nirsoft.net/utils/sound_volume_view.html
+2. Put `SoundVolumeView.exe` either on your PATH or in the same folder as Fay.
+3. Add an `audioOut` field to the scene with the **exact device name** as Windows
+   shows it (the parenthesised full name in the sound flyout), e.g.:
+
+   ```json
+   { "id": "game", "name": "Game", "target": "...",
+     "audioOut": "Hyper X Cloud 3 Wireless (HyperX Cloud III Wireless)" }
+   ```
+
+   Tip: run `SoundVolumeView.exe` once to see the precise names to copy.
+
+**Why Discord isn't affected.** Fay sets only the **Console** and **Multimedia**
+default roles, not **Communications**. Games and media follow Console/Multimedia,
+so they switch; Discord uses its own device selection (or the Communications
+default), so it keeps playing/recording where it was. If you *want* Discord to
+follow too, pin a device in Discord's voice settings rather than using "Default".
+
 ## Summon by mouse button (Ctrl+Mouse5)?
 
 Not supported yet. Tauri's global-shortcut system is **keyboard-only**, so mouse

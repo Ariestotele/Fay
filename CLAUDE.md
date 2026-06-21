@@ -24,6 +24,12 @@ scratch; that wastes the user's usage budget.
 - **Stay in scope.** Fay is a launcher, not a window manager. PowerToys does the
   positioning (see ARCHITECTURE). Don't build a positioning engine.
 
+## Talking to the owner (reply style)
+
+- **Render requests/action items directed at the owner distinctly** — put them in
+  a blockquote led by 📌, separate from explanation and status text. Never bury an
+  ask inside a paragraph. Owner to-dos are also tracked in `docs/STATE.md`.
+
 ## How to run
 
 See `docs/SETUP.md`. Short version once toolchain is installed:
