@@ -2,7 +2,8 @@
   "app": {
     "name": "Fay",
     "tagline": "command deck",
-    "columns": 4
+    "columns": 4,
+    "hotkey": "Ctrl+Alt+Space"
   },
   "scenes": [
     {
