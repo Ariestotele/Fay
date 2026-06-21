@@ -101,6 +101,42 @@ To make scenes resilient:
 - If windows land off-screen after a monitor change, press **Win+Shift+←/→** to
   pull a focused window back onto the active display.
 
+## Your starter deck
+
+`apps.config.json` ships pre-filled with your apps and scenes. A few need a
+one-time check because paths are install-specific (see the `hint` on each tile):
+
+**Apps**
+- **Phone Link** (`ms-phone:`) and **Steam** (`steam://open/main`) work as-is —
+  they use protocol handlers, no path needed.
+- **Task Manager** (`taskmgr`) works as-is. Add `"elevated": true` if you want it
+  to start with admin rights.
+- **Zen**, **Claude**, **LifeOS** — verify the path. Launch the app once, then in
+  Task Manager → right-click → *Open file location* to get the real `.exe` path,
+  and paste it into the tile's `target`. LifeOS can also be a URL if it's a web app.
+- **Discord** points at its Start-Menu shortcut, which survives Discord's
+  auto-updates better than the versioned `app-x.x.x` folder.
+
+**Scenes** point at PowerToys Workspace shortcuts you create once:
+
+| Tile | Build this workspace |
+|------|----------------------|
+| **Focus** | Zen maximized on the ASUS main screen; Discord + Task Manager + LifeOS quartered on the side screen. |
+| **Game** | Leave the main screen for your game; put Steam + Discord + LifeOS on the side screen. |
+| **Side Stack** | Side screen only — quarter Zen, Discord, Task Manager, Steam/LifeOS. |
+
+For each: open the Workspaces editor, arrange the windows, **Save**, then
+**Create desktop shortcut**. Rename the shortcut to match the config
+(`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`) or edit the tile `target` to
+whatever PowerToys named it.
+
+## Summon by mouse button (Ctrl+Mouse5)?
+
+Not supported yet. Tauri's global-shortcut system is **keyboard-only**, so mouse
+buttons can't be bound the way `Ctrl+Alt+Space` is. Doing it properly needs a
+low-level Windows mouse hook (raw input) running alongside the app — tracked as a
+future enhancement. For now the summon hotkey stays **Ctrl+Alt+Space**.
+
 ## Caveats (read before relying on it)
 
 - PowerToys must stay installed — it owns the layouts, Fay only triggers them.

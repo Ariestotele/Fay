@@ -6,34 +6,34 @@
   },
   "scenes": [
     {
-      "id": "work",
-      "name": "Work",
-      "glyph": "▞",
-      "target": "C:\\Users\\you\\Desktop\\Work.lnk",
-      "hint": "Editor · Browser · Music across both screens"
-    },
-    {
       "id": "focus",
       "name": "Focus",
       "glyph": "◳",
-      "target": "C:\\Users\\you\\Desktop\\Focus.lnk",
-      "hint": "Single fullscreen editor"
+      "target": "%USERPROFILE%\\Desktop\\Fay-Focus.lnk",
+      "hint": "Zen maximized on the ASUS main · Discord + Tasks + LifeOS quartered on side"
     },
     {
-      "id": "comms",
-      "name": "Comms",
-      "glyph": "⧉",
-      "target": "C:\\Users\\you\\Desktop\\Comms.lnk",
-      "hint": "Mail + chat, right screen"
+      "id": "game",
+      "name": "Game",
+      "glyph": "◈",
+      "target": "%USERPROFILE%\\Desktop\\Fay-Game.lnk",
+      "hint": "Game on the ASUS main · Steam + Discord + LifeOS on the side screen"
+    },
+    {
+      "id": "side",
+      "name": "Side Stack",
+      "glyph": "⊞",
+      "target": "%USERPROFILE%\\Desktop\\Fay-Side.lnk",
+      "hint": "Side screen only: quarter Zen, Discord, Task Manager, Steam/LifeOS"
     }
   ],
   "apps": [
-    { "id": "code",    "name": "VS Code",  "glyph": "</>", "target": "code" },
-    { "id": "browser", "name": "Browser",  "glyph": "◯",   "target": "msedge" },
-    { "id": "term",    "name": "Terminal", "glyph": "▸_",  "target": "wt" },
-    { "id": "files",   "name": "Files",    "glyph": "▤",   "target": "explorer" },
-    { "id": "spotify", "name": "Spotify",  "glyph": "♪",   "target": "spotify" },
-    { "id": "notion",  "name": "Notion",   "glyph": "✎",   "target": "notion" },
-    { "id": "adminps", "name": "Admin PS", "glyph": "⛨",   "target": "powershell", "elevated": true }
+    { "id": "zen",     "name": "Zen",          "glyph": "◯", "target": "%LOCALAPPDATA%\\Programs\\zen\\zen.exe", "hint": "Zen Browser — verify install path" },
+    { "id": "discord", "name": "Discord",      "glyph": "✦", "target": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk" },
+    { "id": "claude",  "name": "Claude",       "glyph": "✳", "target": "%LOCALAPPDATA%\\AnthropicClaude\\claude.exe", "hint": "Claude desktop — verify install path" },
+    { "id": "lifeos",  "name": "LifeOS",       "glyph": "❖", "target": "lifeos", "hint": "Set to the LifeOS exe path or its web URL" },
+    { "id": "phone",   "name": "Phone Link",   "glyph": "☏", "target": "ms-phone:" },
+    { "id": "steam",   "name": "Steam",        "glyph": "▸", "target": "steam://open/main" },
+    { "id": "taskmgr", "name": "Task Manager", "glyph": "▦", "target": "taskmgr", "hint": "Add \"elevated\": true if you want it to start as admin" }
   ]
 }
