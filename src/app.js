@@ -17,6 +17,12 @@ const invoke =
   tauri && tauri.core && tauri.core.invoke ? tauri.core.invoke.bind(tauri.core) : null;
 
 async function launch(item) {
+  // Optional: switch the system's default playback device for this scene.
+  if (item.audioOut && invoke) {
+    invoke("set_audio_output", { device: item.audioOut }).catch((e) =>
+      flash(`✕ audio: ${e}`)
+    );
+  }
   if (!item.target) return;
   flash(`→ ${item.name}${item.elevated ? " (admin)" : ""}`);
   if (invoke) {

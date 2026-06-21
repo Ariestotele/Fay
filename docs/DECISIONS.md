@@ -76,3 +76,18 @@ enhancement; summon stays **Ctrl+Alt+Space** for now.
 ### 2026-06-21 — Phase 2: UI polish
 Tiles get a staggered entrance animation (honors `prefers-reduced-motion`),
 arrow-key navigation across the grid, and a focus-visible ring matching hover.
+
+### 2026-06-21 — Phase 3: scene audio output via SoundVolumeView
+Scenes may set the default playback device (`audioOut` field). Windows has no
+native CLI, so we shell out to NirSoft `SoundVolumeView.exe` (portable, no
+install). Fay sets only the **Console (0)** + **Multimedia (1)** default roles
+and deliberately leaves **Communications (2)** alone, so changing the "main"
+output does not move Discord. This keeps Fay's own code tiny and stays in scope
+(we trigger a tool, we don't write an audio engine). SoundVolumeView is a runtime
+dependency the user installs, documented in SETUP.md.
+
+### 2026-06-21 — Communication: requests rendered distinctly
+Per owner preference, chat replies must visually separate **action items /
+requests directed at the user** from explanation and status text. Convention:
+put asks in a blockquote led by 📌, never buried in prose. Owner tasks are also
+tracked as a checklist in STATE.md.

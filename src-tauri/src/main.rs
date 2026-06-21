@@ -100,6 +100,38 @@ fn hide_window(app: tauri::AppHandle) {
     }
 }
 
+/// Set the system's default playback device by name, for the Console (0) and
+/// Multimedia (1) roles only — leaving the Communications (2) role untouched.
+///
+/// That split is deliberate: games/media follow Console/Multimedia, so they move
+/// to the new device, while chat apps that follow the Communications default
+/// (e.g. Discord on "Default") are NOT moved. Discord pinned to a specific
+/// device is likewise unaffected.
+///
+/// Requires NirSoft SoundVolumeView.exe on PATH or beside Fay (Windows has no
+/// built-in CLI for this). See docs/SETUP.md.
+#[tauri::command]
+fn set_audio_output(device: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        for role in ["0", "1"] {
+            let status = std::process::Command::new("SoundVolumeView.exe")
+                .args(["/SetDefault", &device, role])
+                .status()
+                .map_err(|e| format!("SoundVolumeView.exe not found: {e}"))?;
+            if !status.success() {
+                return Err(format!("SoundVolumeView exited with {status}"));
+            }
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = device;
+        Err("audio switching is only implemented on Windows".into())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(
@@ -113,7 +145,12 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![launch, list_monitors, hide_window])
+        .invoke_handler(tauri::generate_handler![
+            launch,
+            list_monitors,
+            hide_window,
+            set_audio_output
+        ])
         .setup(|app| {
             // Summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
             use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};

@@ -3,8 +3,8 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-06-21
-**Current phase:** Phase 1 + Phase 2 merged to `main` (CI green). Awaiting owner's
-Windows runtime check + PowerToys Workspace creation.
+**Current phase:** Phase 1 + 2 merged. Phase 3 (scene `audioOut`) in PR. Awaiting
+owner's Windows runtime check + PowerToys Workspace creation.
 
 ## ✅ Done
 
@@ -47,13 +47,24 @@ CI compiles the app, but these are runtime behaviors to confirm on Windows:
 - SETUP.md documents which tiles work out of the box vs. need a path check, and
   how to build each scene's PowerToys Workspace.
 
-## 🔜 Next — owner actions (can't be automated)
+## 📌 Pending — owner tasks (can't be automated)
 
-- Verify the exe paths for Zen / Claude / LifeOS in `apps.config.json`.
-- Create the three PowerToys Workspace shortcuts (`Fay-Focus/Game/Side.lnk`).
-- Run the interactive Windows smoke test (tray, Ctrl+Alt+Space, UAC, monitors).
+- [ ] Verify the exe paths for **Zen / Claude / LifeOS** in `src/apps.config.json`.
+- [ ] Create the three **PowerToys Workspaces** + desktop shortcuts
+      (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`). See SETUP.md.
+- [ ] Run the interactive **Windows smoke test** (window opens, tray,
+      Ctrl+Alt+Space toggle, a UAC tile, footer monitor count).
+- [ ] Install **SoundVolumeView.exe** (PATH or beside Fay) for scene `audioOut`,
+      and confirm the **Game** scene flips audio to the headset without moving Discord.
 
-## 🧭 Later (Phase 3+)
+## ✅ Phase 3 (in PR) — scene audio output
+
+- Scenes can set the default playback device via `audioOut` (Console+Multimedia
+  roles only, so Discord/Communications is untouched). Backend
+  `set_audio_output` shells to NirSoft SoundVolumeView. Wired into scene clicks.
+- Game scene set to switch audio to the Hyper X headset.
+
+## 🧭 Later
 
 - **Ctrl+Mouse5 summon** — requested; needs a low-level Windows mouse hook
   (WH_MOUSE_LL), separate from the keyboard-only global-shortcut plugin. Own phase.
