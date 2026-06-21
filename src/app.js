@@ -96,7 +96,28 @@ async function refreshMonitors() {
 
 function wireKeys() {
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && invoke) invoke("hide_window");
+    if (e.key === "Escape") {
+      if (invoke) invoke("hide_window");
+      return;
+    }
+    if (e.key.startsWith("Arrow")) {
+      const tiles = [...document.querySelectorAll(".tile")];
+      if (!tiles.length) return;
+      const cols =
+        parseInt(
+          getComputedStyle(document.documentElement).getPropertyValue("--cols"),
+          10
+        ) || 4;
+      const cur = tiles.indexOf(document.activeElement);
+      let next = cur;
+      if (cur === -1) next = 0;
+      else if (e.key === "ArrowRight") next = Math.min(cur + 1, tiles.length - 1);
+      else if (e.key === "ArrowLeft") next = Math.max(cur - 1, 0);
+      else if (e.key === "ArrowDown") next = Math.min(cur + cols, tiles.length - 1);
+      else if (e.key === "ArrowUp") next = Math.max(cur - cols, 0);
+      tiles[next].focus();
+      e.preventDefault();
+    }
   });
 }
 
@@ -115,8 +136,17 @@ async function main() {
     if (cfg.app?.tagline) els.brandTag.textContent = cfg.app.tagline;
     document.documentElement.style.setProperty("--cols", cfg.app?.columns || 4);
 
-    (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
-    (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
+    let i = 0;
+    (cfg.scenes || []).forEach((s) => {
+      const el = tile(s, "scene");
+      el.style.setProperty("--i", i++);
+      els.scenes.appendChild(el);
+    });
+    (cfg.apps || []).forEach((a) => {
+      const el = tile(a, "app");
+      el.style.setProperty("--i", i++);
+      els.apps.appendChild(el);
+    });
   } catch (e) {
     flash(`config error: ${e.message}`);
     console.error(e);

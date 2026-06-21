@@ -87,14 +87,29 @@ body::before {
   flex-direction: column;
   justify-content: space-between;
   cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.18s ease;
+  animation: tile-in 0.32s ease backwards;
+  animation-delay: calc(var(--i, 0) * 28ms);
 }
-.tile:hover {
+.tile:hover,
+.tile:focus-visible {
   transform: translateY(-2px);
   border-color: var(--accent-dim);
   box-shadow: var(--glow);
+  outline: none;
 }
 .tile:active { transform: translateY(0) scale(0.985); }
+
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile { animation: none; }
+}
 
 .tile__glyph { color: var(--accent); font-size: 20px; line-height: 1; }
 .tile__name { font-size: 14px; letter-spacing: 0.04em; }
