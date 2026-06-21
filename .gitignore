@@ -7,9 +7,6 @@ package-lock.json
 src-tauri/target/
 src-tauri/gen/
 
-# Generated Tauri icons (run `npm run tauri icon` locally)
-src-tauri/icons/
-
 # OS
 .DS_Store
 Thumbs.db
