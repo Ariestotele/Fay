@@ -60,3 +60,19 @@ saved for 2"). Actual positioning stays with PowerToys.
 ### 2026-06-21 — Phase 1: window hides on focus loss
 Launcher behavior — the Fay window hides when it loses focus and is summoned
 again via hotkey/tray. Escape also hides it.
+
+### 2026-06-21 — Phase 2: real deck wired in
+`apps.config.json` is now filled with the owner's actual apps (Zen, Discord,
+Claude, LifeOS, Phone Link, Steam, Task Manager) and three scenes (Focus, Game,
+Side Stack). Protocol-handler targets (`ms-phone:`, `steam://`) and `taskmgr`
+work out of the box; exe-path tiles carry a `hint` to verify the install path.
+
+### 2026-06-21 — Mouse-button summon (Ctrl+Mouse5) deferred
+Requested, but `tauri-plugin-global-shortcut` is keyboard-only — it cannot bind
+mouse buttons. A global mouse-button trigger requires a low-level Windows mouse
+hook (WH_MOUSE_LL / raw input) running beside the app. Deferred as a future
+enhancement; summon stays **Ctrl+Alt+Space** for now.
+
+### 2026-06-21 — Phase 2: UI polish
+Tiles get a staggered entrance animation (honors `prefers-reduced-motion`),
+arrow-key navigation across the grid, and a focus-visible ring matching hover.

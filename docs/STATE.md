@@ -3,7 +3,7 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-06-21
-**Current phase:** Phase 1 implemented (needs build verification on Windows)
+**Current phase:** Phase 2 in progress — Phase 1 merged to `main` (CI green)
 
 ## ✅ Done
 
@@ -36,11 +36,20 @@ CI compiles the app, but these are runtime behaviors to confirm on Windows:
 3. An `elevated` tile raises a UAC prompt.
 4. The footer shows your real monitor count.
 
-## 🔜 Next (Phase 2)
+## ✅ Phase 2 (in progress)
 
-- Polish dark UI (hover/animation/glow refinements).
-- Wire your **real** apps + a real PowerToys Workspace `.lnk` into a scene.
+- UI polish: staggered tile entrance, arrow-key nav, focus-visible ring.
+- Real deck wired into `apps.config.json`: apps (Zen, Discord, Claude, LifeOS,
+  Phone Link, Steam, Task Manager) + scenes (Focus, Game, Side Stack).
+- SETUP.md documents which tiles work out of the box vs. need a path check, and
+  how to build each scene's PowerToys Workspace.
+
+## 🔜 Phase 2 remaining / next
+
+- **User action:** verify the exe paths for Zen / Claude / LifeOS, and create the
+  three PowerToys Workspace shortcuts (Fay-Focus/Game/Side.lnk). See SETUP.md.
 - Optional: make the summon hotkey configurable from `apps.config.json`.
+- Deferred: Ctrl+Mouse5 summon (needs a low-level mouse hook — see DECISIONS.md).
 
 ## 🧭 Later (Phases 3–4)
 
