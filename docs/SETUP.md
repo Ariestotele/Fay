@@ -57,6 +57,50 @@ Edit **`src/apps.config.json`**. No rebuild needed in dev — refresh the window
 3. Use "Create desktop shortcut".
 4. Put that `.lnk` path into a `scenes[].target` in `apps.config.json`.
 
+## Summoning Fay
+
+- **Ctrl+Alt+Space** toggles the Fay window (registered globally).
+- Left-click the **tray icon** (or its menu) to show/hide; tray menu has Quit.
+- **Escape** or clicking away hides the window (it keeps running in the tray).
+
+## Elevated (admin) apps
+
+Set `"elevated": true` on a tile in `apps.config.json`:
+
+```json
+{ "id": "adminps", "name": "Admin PS", "glyph": "⛨", "target": "powershell", "elevated": true }
+```
+
+Fay launches it via `Start-Process -Verb RunAs`, so you'll get a normal **UAC
+prompt**. Fay itself stays un-elevated.
+
+### Want no UAC prompt for a specific admin app?
+
+Use a scheduled task (standard Windows trick):
+
+1. Task Scheduler → Create Task → check **Run with highest privileges**.
+2. Action = the program you want elevated.
+3. In `apps.config.json`, point the tile at the task instead:
+   `"target": "schtasks", "elevated": false` won't pass args — instead use a
+   `.lnk`/`.bat` that runs `schtasks /run /tn "YourTaskName"` and target that.
+
+> Note: PowerToys can only *position* an elevated app's window if PowerToys is
+> also running elevated. If your admin apps must be snapped into a scene, run
+> PowerToys as administrator.
+
+## Multi-monitor
+
+Fay shows your live display layout in the footer (e.g. `⧉ 2 displays · 5120×1440`).
+This is intentional: if a scene opens windows off-screen, the footer tells you
+why (your display setup differs from when the scene was saved).
+
+To make scenes resilient:
+
+- Save a PowerToys Workspace **per physical setup** (e.g. `Work-2mon`, `Work-laptop`)
+  and add a tile for each.
+- If windows land off-screen after a monitor change, press **Win+Shift+←/→** to
+  pull a focused window back onto the active display.
+
 ## Caveats (read before relying on it)
 
 - PowerToys must stay installed — it owns the layouts, Fay only triggers them.

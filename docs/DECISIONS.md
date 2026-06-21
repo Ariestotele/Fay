@@ -38,3 +38,25 @@ session (token-budget goal).
 PowerToys dependency, no official launch-by-name CLI (use generated .lnk),
 launches fresh instances, absolute paths not portable, multi-monitor fragility,
 admin apps, WebView2 requirement, hotkey collisions. See docs/SETUP.md "Caveats".
+
+### 2026-06-21 — Phase 1: summon hotkey is Ctrl+Alt+Space
+The Win (Super) key is heavily reserved by Windows and registration is flaky, so
+the default summon hotkey is **Ctrl+Alt+Space**. Configurable later; registered
+Rust-side in `src-tauri/src/main.rs`.
+
+### 2026-06-21 — Phase 1: elevated apps via Start-Process -Verb RunAs
+A tile may set `"elevated": true`. Fay (running un-elevated) launches it through
+`powershell Start-Process -Verb RunAs`, which raises a normal UAC prompt. Fay
+itself stays un-elevated so normal launches and drag/UX aren't affected. The
+no-prompt alternative (a scheduled task set to highest privileges) is documented
+in SETUP.md for users who want it.
+
+### 2026-06-21 — Phase 1: multi-monitor = visibility, not control
+Fay does not move windows. To address monitor fragility it exposes a
+`list_monitors` command and shows the live layout in the footer, so a scene that
+lands off-screen is immediately explainable ("you have 1 display now, scene was
+saved for 2"). Actual positioning stays with PowerToys.
+
+### 2026-06-21 — Phase 1: window hides on focus loss
+Launcher behavior — the Fay window hides when it loses focus and is summoned
+again via hotkey/tray. Escape also hides it.

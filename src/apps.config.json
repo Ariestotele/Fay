@@ -33,6 +33,7 @@
     { "id": "term",    "name": "Terminal", "glyph": "▸_",  "target": "wt" },
     { "id": "files",   "name": "Files",    "glyph": "▤",   "target": "explorer" },
     { "id": "spotify", "name": "Spotify",  "glyph": "♪",   "target": "spotify" },
-    { "id": "notion",  "name": "Notion",   "glyph": "✎",   "target": "notion" }
+    { "id": "notion",  "name": "Notion",   "glyph": "✎",   "target": "notion" },
+    { "id": "adminps", "name": "Admin PS", "glyph": "⛨",   "target": "powershell", "elevated": true }
   ]
 }

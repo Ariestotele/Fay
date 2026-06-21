@@ -30,14 +30,27 @@ PowerToys Workspaces can save a layout and **generate a desktop shortcut** that
 launches that whole app-group into position. Fay's "scene" tiles simply run that
 `.lnk`. Single-app tiles run a plain command/exe.
 
-So Fay never positions a window itself. The backend has exactly one job:
+So Fay never positions a window itself. The backend exposes a few small commands:
 
 ```rust
-launch(target) -> runs `cmd /C start "" <target>`
+launch(target, elevated)  // un-elevated: cmd /C start "" <target>
+                          // elevated:    powershell Start-Process -Verb RunAs
+list_monitors()           // current display layout (for the footer readout)
+hide_window()             // Escape-to-hide
 ```
 
-That handles `.exe`, plain commands on PATH (`code`, `spotify`), `.lnk` files,
-and URLs uniformly.
+`launch` handles `.exe`, plain commands on PATH (`code`, `spotify`), `.lnk`
+files, and URLs uniformly. `elevated: true` tiles raise a UAC prompt so admin
+apps work without Fay itself running elevated.
+
+### Tray + hotkey (Phase 1)
+
+- A **system tray** icon shows/hides Fay and offers Quit.
+- A **global hotkey** (Ctrl+Alt+Space) summons/hides the window.
+- The window **hides on focus loss** — launcher behavior; re-summon via hotkey/tray.
+
+All of this is wired Rust-side in `src-tauri/src/main.rs`, so the frontend needs
+no extra capability permissions beyond `core:default`.
 
 ## Config schema (`src/apps.config.json`)
 

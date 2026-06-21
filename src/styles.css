@@ -109,12 +109,29 @@ body::before {
 .tile--scene { background: linear-gradient(180deg, var(--bg-soft), var(--panel)); }
 .tile--scene .tile__glyph { font-size: 24px; }
 
+.tile__badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  color: #ffcf6b;
+  border: 1px solid #4a3a16;
+  background: #1a1305;
+  border-radius: 5px;
+  padding: 2px 5px;
+}
+
 .deck__foot {
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   color: var(--txt-dim);
   font-size: 11px;
   letter-spacing: 0.16em;
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
+.foot__monitors { color: var(--txt-dim); }
 #status.is-flash { color: var(--accent); }
