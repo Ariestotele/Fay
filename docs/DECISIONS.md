@@ -98,3 +98,8 @@ Per owner preference, chat replies must visually separate **action items /
 requests directed at the user** from explanation and status text. Convention:
 put asks in a blockquote led by 📌, never buried in prose. Owner tasks are also
 tracked as a checklist in STATE.md.
+
+### 2026-06-21 — Communication convention revised (supersedes above)
+Owner finds shaded blockquotes hard to read. Requests/action items should be
+visually **structured** instead — a dedicated heading plus a numbered list or
+table, not a blockquote. Keep them separate from explanation/status.
