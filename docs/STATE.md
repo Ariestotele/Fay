@@ -3,8 +3,8 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-06-21
-**Current phase:** Phase 1 + 2 merged. Phase 3 (scene `audioOut`) in PR. Awaiting
-owner's Windows runtime check + PowerToys Workspace creation.
+**Current phase:** Phases 1–3 merged. Phase 4 (config-driven hotkey) in PR.
+Awaiting owner's Windows runtime check + PowerToys Workspace creation.
 
 ## ✅ Done
 
@@ -57,12 +57,18 @@ CI compiles the app, but these are runtime behaviors to confirm on Windows:
 - [ ] Install **SoundVolumeView.exe** (PATH or beside Fay) for scene `audioOut`,
       and confirm the **Game** scene flips audio to the headset without moving Discord.
 
-## ✅ Phase 3 (in PR) — scene audio output
+## ✅ Phase 3 (merged) — scene audio output
 
 - Scenes can set the default playback device via `audioOut` (Console+Multimedia
   roles only, so Discord/Communications is untouched). Backend
   `set_audio_output` shells to NirSoft SoundVolumeView. Wired into scene clicks.
 - Game scene set to switch audio to the Hyper X headset.
+
+## ✅ Phase 4 (in PR) — config-driven summon hotkey
+
+- `app.hotkey` in `apps.config.json` sets the summon combo; `set_summon_hotkey`
+  parses + re-registers it at load. `Ctrl+Alt+Space` is the fallback.
+- Keyboard-only; mouse-button summon still needs the deferred mouse hook.
 
 ## 🧭 Later
 

@@ -142,6 +142,13 @@ async function main() {
     if (cfg.app?.tagline) els.brandTag.textContent = cfg.app.tagline;
     document.documentElement.style.setProperty("--cols", cfg.app?.columns || 4);
 
+    // Let the config override the summon hotkey (keyboard combos only).
+    if (cfg.app?.hotkey && invoke) {
+      invoke("set_summon_hotkey", { accelerator: cfg.app.hotkey }).catch((e) =>
+        console.error("hotkey:", e)
+      );
+    }
+
     let i = 0;
     (cfg.scenes || []).forEach((s) => {
       const el = tile(s, "scene");

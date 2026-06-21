@@ -132,6 +132,21 @@ fn set_audio_output(device: String) -> Result<(), String> {
     }
 }
 
+/// Re-register the global summon hotkey from a config accelerator string, e.g.
+/// "Ctrl+Alt+Space" or "CmdOrCtrl+Shift+Space". Keyboard combos only — mouse
+/// buttons aren't supported by the global-shortcut system (see DECISIONS.md).
+#[tauri::command]
+fn set_summon_hotkey(app: tauri::AppHandle, accelerator: String) -> Result<(), String> {
+    use std::str::FromStr;
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+    let shortcut =
+        Shortcut::from_str(&accelerator).map_err(|e| format!("bad hotkey '{accelerator}': {e}"))?;
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    gs.register(shortcut).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(
@@ -149,7 +164,8 @@ fn main() {
             launch,
             list_monitors,
             hide_window,
-            set_audio_output
+            set_audio_output,
+            set_summon_hotkey
         ])
         .setup(|app| {
             // Summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).

@@ -130,6 +130,20 @@ For each: open the Workspaces editor, arrange the windows, **Save**, then
 (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`) or edit the tile `target` to
 whatever PowerToys named it.
 
+## Changing the summon hotkey
+
+Set `app.hotkey` in `apps.config.json` — no rebuild needed, just refresh:
+
+```json
+"app": { "name": "Fay", "hotkey": "Ctrl+Alt+Space" }
+```
+
+Accepted modifiers: `Ctrl`/`Control`, `CmdOrCtrl`/`CommandOrControl`, `Alt`,
+`Shift`, `Super` (the Win key). Combine with `+` and a key, e.g.
+`CmdOrCtrl+Shift+Space`, `Alt+Backquote`. **Keyboard only** — mouse buttons such
+as Mouse5 aren't supported (see "Summon by mouse button" below). An invalid
+string is ignored and Fay falls back to the built-in `Ctrl+Alt+Space`.
+
 ## Switching audio output per scene
 
 A scene can change your **default playback device** when you click it — e.g. the

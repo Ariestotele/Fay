@@ -86,6 +86,13 @@ output does not move Discord. This keeps Fay's own code tiny and stays in scope
 (we trigger a tool, we don't write an audio engine). SoundVolumeView is a runtime
 dependency the user installs, documented in SETUP.md.
 
+### 2026-06-21 — Phase 4: summon hotkey is config-driven
+The summon hotkey now comes from `app.hotkey` in `apps.config.json`. The frontend
+passes it to a `set_summon_hotkey` command that parses the accelerator
+(`Shortcut::from_str`) and re-registers it; `Ctrl+Alt+Space` stays the built-in
+default/fallback. Keeps with the "routine changes are JSON edits" rule. Still
+keyboard-only (mouse buttons need the deferred mouse hook).
+
 ### 2026-06-21 — Communication: requests rendered distinctly
 Per owner preference, chat replies must visually separate **action items /
 requests directed at the user** from explanation and status text. Convention:
