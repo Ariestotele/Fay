@@ -1,0 +1,38 @@
+{
+  "app": {
+    "name": "Fay",
+    "tagline": "command deck",
+    "columns": 4
+  },
+  "scenes": [
+    {
+      "id": "work",
+      "name": "Work",
+      "glyph": "▞",
+      "target": "C:\\Users\\you\\Desktop\\Work.lnk",
+      "hint": "Editor · Browser · Music across both screens"
+    },
+    {
+      "id": "focus",
+      "name": "Focus",
+      "glyph": "◳",
+      "target": "C:\\Users\\you\\Desktop\\Focus.lnk",
+      "hint": "Single fullscreen editor"
+    },
+    {
+      "id": "comms",
+      "name": "Comms",
+      "glyph": "⧉",
+      "target": "C:\\Users\\you\\Desktop\\Comms.lnk",
+      "hint": "Mail + chat, right screen"
+    }
+  ],
+  "apps": [
+    { "id": "code",    "name": "VS Code",  "glyph": "</>", "target": "code" },
+    { "id": "browser", "name": "Browser",  "glyph": "◯",   "target": "msedge" },
+    { "id": "term",    "name": "Terminal", "glyph": "▸_",  "target": "wt" },
+    { "id": "files",   "name": "Files",    "glyph": "▤",   "target": "explorer" },
+    { "id": "spotify", "name": "Spotify",  "glyph": "♪",   "target": "spotify" },
+    { "id": "notion",  "name": "Notion",   "glyph": "✎",   "target": "notion" }
+  ]
+}

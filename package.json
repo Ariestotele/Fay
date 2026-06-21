@@ -1,0 +1,14 @@
+{
+  "name": "fay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fay — a minimal dark desktop launcher hub for Windows.",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

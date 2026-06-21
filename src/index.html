@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fay</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="deck">
+      <header class="deck__head">
+        <div class="brand">
+          <span class="brand__mark">⟡</span>
+          <span class="brand__name" id="brandName">Fay</span>
+          <span class="brand__tag" id="brandTag">command deck</span>
+        </div>
+        <div class="clock" id="clock">--:--</div>
+      </header>
+
+      <section class="group">
+        <h2 class="group__label">scenes</h2>
+        <div class="grid" id="scenes"></div>
+      </section>
+
+      <section class="group">
+        <h2 class="group__label">apps</h2>
+        <div class="grid" id="apps"></div>
+      </section>
+
+      <footer class="deck__foot">
+        <span id="status">ready</span>
+      </footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
