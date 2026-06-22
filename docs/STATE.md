@@ -2,9 +2,21 @@
 
 > Update this at the end of every session. New chats read this first.
 
-**Last updated:** 2026-06-21
-**Current phase:** Phases 1–4 merged. Phase 5 (autostart at login) in PR.
-Awaiting owner's Windows runtime check + PowerToys Workspace creation.
+**Last updated:** 2026-06-22
+**Current phase:** Phases 1–5 merged. **Phase 6 (HUD redesign) in design** —
+awaiting owner sign-off on the "Fay's Heart" concept (see below). Also awaiting
+owner's Windows runtime check + PowerToys Workspace creation.
+
+## 🎨 Phase 6 design — "Fay's Heart" (proposed, not yet built)
+
+- Background **"Fay's Heart"**: a ring/torus made of **hundreds of mini particles
+  orbiting** in a wavy band — AI-mind style — with a heartbeat pulse (the band
+  breathes; particles drift/swirl). Not liquid, not techy reactor: particle cloud.
+- **Tiles layer on top** of the heart, centered in the calm dark middle of the ring.
+- Palette: deep blue/teal, or `accent: "auto"` to match the Windows accent color.
+- Full-screen translucent overlay on the **active monitor** (not spanning both).
+- Likely a lightweight `<canvas>` particle system (a few hundred points) rather
+  than SVG, for smooth motion. Concept mockups rendered for owner review.
 
 ## ✅ Done
 
