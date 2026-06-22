@@ -144,6 +144,19 @@ Accepted modifiers: `Ctrl`/`Control`, `CmdOrCtrl`/`CommandOrControl`, `Alt`,
 as Mouse5 aren't supported (see "Summon by mouse button" below). An invalid
 string is ignored and Fay falls back to the built-in `Ctrl+Alt+Space`.
 
+## Launch at login (autostart)
+
+Set `app.autostart` in `apps.config.json`:
+
+```json
+"app": { "name": "Fay", "autostart": true }
+```
+
+`true` registers Fay to start when you log in; `false` removes it. The setting is
+applied each time Fay loads, so flipping the value and reopening Fay is all it
+takes. (In `npm run dev` this registers the *dev* build path — fine for testing,
+but enable it for real from an installed build.)
+
 ## Switching audio output per scene
 
 A scene can change your **default playback device** when you click it — e.g. the

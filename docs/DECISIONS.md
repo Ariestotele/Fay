@@ -104,6 +104,12 @@ Owner finds shaded blockquotes hard to read. Requests/action items should be
 visually **structured** instead — a dedicated heading plus a numbered list or
 table, not a blockquote. Keep them separate from explanation/status.
 
+### 2026-06-21 — Phase 5: autostart at login
+Launch-at-login via `tauri-plugin-autostart`, toggled by `app.autostart` in
+`apps.config.json` (default `false`). A `set_autostart` command flips it through
+the plugin's Rust `ManagerExt` (so no extra capability permission needed). Stays
+config-driven and in scope.
+
 ### 2026-06-21 — Communication convention: boxed panel (supersedes above)
 Owner wants any request, question, or expected instruction rendered as a
 **highlighted boxed panel** — a bordered Markdown table with a titled header row
