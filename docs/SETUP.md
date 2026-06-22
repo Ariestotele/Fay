@@ -177,6 +177,45 @@ buttons can't be bound the way `Ctrl+Alt+Space` is. Doing it properly needs a
 low-level Windows mouse hook (raw input) running alongside the app — tracked as a
 future enhancement. For now the summon hotkey stays **Ctrl+Alt+Space**.
 
+## Reference: app targets & links
+
+The source of truth is `src/apps.config.json` — edit each tile's `target` there.
+This table tracks every target and whether you still need to supply a real value.
+
+**App tiles**
+
+| Tile | Current `target` | Status |
+| :-- | :-- | :-- |
+| Phone Link | `ms-phone:` | ✅ works (protocol) |
+| Steam | `steam://open/main` | ✅ works (protocol) |
+| Task Manager | `taskmgr` | ✅ works (on PATH) |
+| Discord | `%APPDATA%\…\Discord Inc\Discord.lnk` | ✅ works (verify folder name) |
+| **Zen** | `%LOCALAPPDATA%\Programs\zen\zen.exe` | ⚠️ **verify the real exe path** |
+| **Claude** | `%LOCALAPPDATA%\AnthropicClaude\claude.exe` | ⚠️ **verify the real exe path** |
+| **LifeOS** | `lifeos` (placeholder) | ⚠️ **set exe path OR web URL** |
+
+To get a real path: launch the app → Task Manager → right-click it → *Open file
+location* → copy the full `.exe` path into the tile's `target`.
+
+**Scene tiles** (each needs a PowerToys Workspace shortcut you create)
+
+| Scene | `target` to create | Extra |
+| :-- | :-- | :-- |
+| Focus | `%USERPROFILE%\Desktop\Fay-Focus.lnk` | — |
+| Game | `%USERPROFILE%\Desktop\Fay-Game.lnk` | `audioOut` → Hyper X headset |
+| Side Stack | `%USERPROFILE%\Desktop\Fay-Side.lnk` | — |
+
+**Tool downloads** (only what you don't already have)
+
+| Tool | For | Link |
+| :-- | :-- | :-- |
+| Git | clone the repo | https://git-scm.com/download/win |
+| Python | quick UI preview server | https://www.python.org/downloads/ |
+| Node.js | preview alt + full app | https://nodejs.org |
+| Rust | full app build | https://rustup.rs |
+| PowerToys | scene window layouts | https://learn.microsoft.com/windows/powertoys/install |
+| SoundVolumeView | per-scene audio switching | https://www.nirsoft.net/utils/sound_volume_view.html |
+
 ## Caveats (read before relying on it)
 
 - PowerToys must stay installed — it owns the layouts, Fay only triggers them.
