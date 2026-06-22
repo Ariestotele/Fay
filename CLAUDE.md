@@ -26,10 +26,11 @@ scratch; that wastes the user's usage budget.
 
 ## Talking to the owner (reply style)
 
-- **Render requests/action items to the owner as a visually structured block** —
-  a dedicated heading plus a numbered list or table. Do NOT use shaded blockquotes
-  (hard to read). Keep asks separate from explanation/status; never bury an ask in
-  a paragraph. Owner to-dos are also tracked in `docs/STATE.md`.
+- **Render any request, question, or action expected from the owner as a
+  highlighted boxed panel** — a bordered Markdown table whose header row is the
+  title (e.g. a 🔔 label). NOT blockquotes (too dark) and never buried in prose.
+  Keep asks visually separate from explanation/status. Owner to-dos are also
+  tracked in `docs/STATE.md`.
 
 ## How to run
 

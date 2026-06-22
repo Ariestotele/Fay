@@ -103,3 +103,8 @@ tracked as a checklist in STATE.md.
 Owner finds shaded blockquotes hard to read. Requests/action items should be
 visually **structured** instead — a dedicated heading plus a numbered list or
 table, not a blockquote. Keep them separate from explanation/status.
+
+### 2026-06-21 — Communication convention: boxed panel (supersedes above)
+Owner wants any request, question, or expected instruction rendered as a
+**highlighted boxed panel** — a bordered Markdown table with a titled header row
+(🔔) — for maximum visibility. This is the current convention.
