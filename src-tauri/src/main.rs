@@ -147,6 +147,18 @@ fn set_summon_hotkey(app: tauri::AppHandle, accelerator: String) -> Result<(), S
     Ok(())
 }
 
+/// Enable or disable launching Fay at login (config: `app.autostart`).
+#[tauri::command]
+fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable().map_err(|e| e.to_string())
+    } else {
+        manager.disable().map_err(|e| e.to_string())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(
@@ -160,12 +172,17 @@ fn main() {
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .invoke_handler(tauri::generate_handler![
             launch,
             list_monitors,
             hide_window,
             set_audio_output,
-            set_summon_hotkey
+            set_summon_hotkey,
+            set_autostart
         ])
         .setup(|app| {
             // Summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).

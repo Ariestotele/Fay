@@ -149,6 +149,13 @@ async function main() {
       );
     }
 
+    // Launch-at-login, driven by config.
+    if (typeof cfg.app?.autostart === "boolean" && invoke) {
+      invoke("set_autostart", { enabled: cfg.app.autostart }).catch((e) =>
+        console.error("autostart:", e)
+      );
+    }
+
     let i = 0;
     (cfg.scenes || []).forEach((s) => {
       const el = tile(s, "scene");

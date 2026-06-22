@@ -3,7 +3,7 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-06-21
-**Current phase:** Phases 1–3 merged. Phase 4 (config-driven hotkey) in PR.
+**Current phase:** Phases 1–4 merged. Phase 5 (autostart at login) in PR.
 Awaiting owner's Windows runtime check + PowerToys Workspace creation.
 
 ## ✅ Done
@@ -64,16 +64,24 @@ CI compiles the app, but these are runtime behaviors to confirm on Windows:
   `set_audio_output` shells to NirSoft SoundVolumeView. Wired into scene clicks.
 - Game scene set to switch audio to the Hyper X headset.
 
-## ✅ Phase 4 (in PR) — config-driven summon hotkey
+## ✅ Phase 4 (merged) — config-driven summon hotkey
 
 - `app.hotkey` in `apps.config.json` sets the summon combo; `set_summon_hotkey`
   parses + re-registers it at load. `Ctrl+Alt+Space` is the fallback.
 - Keyboard-only; mouse-button summon still needs the deferred mouse hook.
 
+## ✅ Phase 5 (in PR) — autostart at login
+
+- `app.autostart` (bool) in `apps.config.json` registers/unregisters Fay at login
+  via `tauri-plugin-autostart`; `set_autostart` command applies it on load.
+
 ## 🧭 Later
 
 - **Ctrl+Mouse5 summon** — requested; needs a low-level Windows mouse hook
   (WH_MOUSE_LL), separate from the keyboard-only global-shortcut plugin. Own phase.
+  Best built when the owner can interactively test it.
+- Search + categories once the deck exceeds ~20 tiles.
+- `machine`/profile key so paths differ per computer.
 - Make the summon hotkey configurable from `apps.config.json`.
 - Search + categories once tiles exceed ~20.
 - `machine`/profile key so paths differ per computer.

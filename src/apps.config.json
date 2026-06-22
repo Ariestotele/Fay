@@ -3,7 +3,8 @@
     "name": "Fay",
     "tagline": "command deck",
     "columns": 4,
-    "hotkey": "Ctrl+Alt+Space"
+    "hotkey": "Ctrl+Alt+Space",
+    "autostart": false
   },
   "scenes": [
     {

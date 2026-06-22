@@ -26,9 +26,11 @@ scratch; that wastes the user's usage budget.
 
 ## Talking to the owner (reply style)
 
-- **Render requests/action items directed at the owner distinctly** — put them in
-  a blockquote led by 📌, separate from explanation and status text. Never bury an
-  ask inside a paragraph. Owner to-dos are also tracked in `docs/STATE.md`.
+- **Render any request, question, or action expected from the owner as a
+  highlighted boxed panel** — a bordered Markdown table whose header row is the
+  title (e.g. a 🔔 label). NOT blockquotes (too dark) and never buried in prose.
+  Keep asks visually separate from explanation/status. Owner to-dos are also
+  tracked in `docs/STATE.md`.
 
 ## How to run
 
