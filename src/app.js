@@ -1,27 +1,30 @@
-// Fay — config-driven hub.
+// Fay — config-driven hub logic. Rendering of the Heart lives in heart.js.
 // The UI is rendered entirely from apps.config.json. Never hardcode tiles here.
 
 const els = {
   scenes: document.getElementById("scenes"),
   apps: document.getElementById("apps"),
-  brandName: document.getElementById("brandName"),
-  brandTag: document.getElementById("brandTag"),
+  brand: document.getElementById("brand"),
   status: document.getElementById("status"),
   monitors: document.getElementById("monitors"),
   clock: document.getElementById("clock"),
+  core: document.getElementById("core"),
+  canvas: document.getElementById("heart"),
 };
 
-// Are we inside Tauri? (withGlobalTauri exposes window.__TAURI__)
 const tauri = window.__TAURI__ || null;
 const invoke =
   tauri && tauri.core && tauri.core.invoke ? tauri.core.invoke.bind(tauri.core) : null;
 
+// ---- open / rest state ----------------------------------------------------
+function openDeck() { document.body.classList.add("open"); }
+function closeDeck() { document.body.classList.remove("open"); }
+function isOpen() { return document.body.classList.contains("open"); }
+
+// ---- launching ------------------------------------------------------------
 async function launch(item) {
-  // Optional: switch the system's default playback device for this scene.
   if (item.audioOut && invoke) {
-    invoke("set_audio_output", { device: item.audioOut }).catch((e) =>
-      flash(`✕ audio: ${e}`)
-    );
+    invoke("set_audio_output", { device: item.audioOut }).catch((e) => flash(`✕ audio: ${e}`));
   }
   if (!item.target) return;
   flash(`→ ${item.name}${item.elevated ? " (admin)" : ""}`);
@@ -53,7 +56,7 @@ function tile(item, kind) {
   const badge = item.elevated ? `<span class="tile__badge">ADMIN</span>` : "";
   el.innerHTML = `
     ${badge}
-    <span class="tile__glyph">${escapeHtml(item.glyph || "▢")}</span>
+    <span class="tile__glyph">${escapeHtml(item.glyph || "○")}</span>
     <div>
       <div class="tile__name">${escapeHtml(item.name)}</div>
       ${item.hint ? `<div class="tile__hint">${escapeHtml(item.hint)}</div>` : ""}
@@ -70,8 +73,7 @@ function escapeHtml(s) {
 
 function startClock() {
   const tick = () => {
-    const d = new Date();
-    els.clock.textContent = d
+    els.clock.textContent = new Date()
       .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       .toUpperCase();
   };
@@ -79,51 +81,54 @@ function startClock() {
   setInterval(tick, 15000);
 }
 
-// Show the live monitor layout so a scene landing off-screen is explainable.
 async function refreshMonitors() {
-  if (!invoke) {
-    els.monitors.textContent = "⧉ preview";
-    return;
-  }
+  if (!invoke) { els.monitors.textContent = "⧉ preview"; return; }
   try {
     const mons = await invoke("list_monitors");
-    const total = mons.reduce(
-      (a, m) => ({ w: a.w + m.width, h: Math.max(a.h, m.height) }),
-      { w: 0, h: 0 }
-    );
-    const label = `⧉ ${mons.length} display${mons.length === 1 ? "" : "s"} · ${total.w}×${total.h}`;
-    els.monitors.textContent = label;
-    els.monitors.dataset.count = String(mons.length);
+    const w = mons.reduce((a, m) => a + m.width, 0);
+    const h = mons.reduce((a, m) => Math.max(a, m.height), 0);
+    els.monitors.textContent = `⧉ ${mons.length} display${mons.length === 1 ? "" : "s"} · ${w}×${h}`;
   } catch (e) {
     els.monitors.textContent = "⧉ —";
-    console.error(e);
   }
 }
 
-function wireKeys() {
+async function applyAccent(value) {
+  let accent = value || "#34e6c6";
+  if (accent === "auto" && invoke) {
+    try { accent = await invoke("get_accent_color"); } catch (e) { accent = "#34e6c6"; }
+  }
+  document.documentElement.style.setProperty("--accent", accent);
+  if (window.Heart) window.Heart.setAccent(accent);
+}
+
+function wireInput() {
+  els.core.addEventListener("click", openDeck);
+  // clicking the empty canvas (backdrop) while open returns to rest
+  els.canvas.addEventListener("mousedown", () => { if (isOpen()) closeDeck(); });
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (invoke) invoke("hide_window");
+      if (isOpen()) closeDeck();
+      else if (invoke) invoke("hide_window");
       return;
     }
-    if (e.key.startsWith("Arrow")) {
+    if (e.key === "Enter" && !isOpen()) { openDeck(); return; }
+    if (isOpen() && e.key.startsWith("Arrow")) {
       const tiles = [...document.querySelectorAll(".tile")];
       if (!tiles.length) return;
-      const cols =
-        parseInt(
-          getComputedStyle(document.documentElement).getPropertyValue("--cols"),
-          10
-        ) || 4;
       const cur = tiles.indexOf(document.activeElement);
-      let next = cur;
-      if (cur === -1) next = 0;
-      else if (e.key === "ArrowRight") next = Math.min(cur + 1, tiles.length - 1);
-      else if (e.key === "ArrowLeft") next = Math.max(cur - 1, 0);
-      else if (e.key === "ArrowDown") next = Math.min(cur + cols, tiles.length - 1);
-      else if (e.key === "ArrowUp") next = Math.max(cur - cols, 0);
+      let next = cur < 0 ? 0 : cur;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = Math.min(cur + 1, tiles.length - 1);
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = Math.max(cur - 1, 0);
       tiles[next].focus();
       e.preventDefault();
     }
+  });
+
+  // re-read the Windows accent when Fay regains focus (it may have changed)
+  window.addEventListener("focus", () => {
+    if (window.__fayAccent === "auto") applyAccent("auto");
   });
 }
 
@@ -135,38 +140,27 @@ async function loadConfig() {
 
 async function main() {
   startClock();
-  wireKeys();
+  wireInput();
   try {
     const cfg = await loadConfig();
-    if (cfg.app?.name) els.brandName.textContent = cfg.app.name;
-    if (cfg.app?.tagline) els.brandTag.textContent = cfg.app.tagline;
-    document.documentElement.style.setProperty("--cols", cfg.app?.columns || 4);
+    const app = cfg.app || {};
+    if (app.name) els.brand.textContent = app.name.toUpperCase();
 
-    // Let the config override the summon hotkey (keyboard combos only).
-    if (cfg.app?.hotkey && invoke) {
-      invoke("set_summon_hotkey", { accelerator: cfg.app.hotkey }).catch((e) =>
-        console.error("hotkey:", e)
-      );
+    if (typeof app.backdrop === "number") {
+      document.documentElement.style.setProperty("--backdrop-alpha", String(app.backdrop));
+    }
+    window.__fayAccent = app.accent || "#34e6c6";
+    applyAccent(window.__fayAccent);
+
+    if (app.hotkey && invoke) {
+      invoke("set_summon_hotkey", { accelerator: app.hotkey }).catch((e) => console.error("hotkey:", e));
+    }
+    if (typeof app.autostart === "boolean" && invoke) {
+      invoke("set_autostart", { enabled: app.autostart }).catch((e) => console.error("autostart:", e));
     }
 
-    // Launch-at-login, driven by config.
-    if (typeof cfg.app?.autostart === "boolean" && invoke) {
-      invoke("set_autostart", { enabled: cfg.app.autostart }).catch((e) =>
-        console.error("autostart:", e)
-      );
-    }
-
-    let i = 0;
-    (cfg.scenes || []).forEach((s) => {
-      const el = tile(s, "scene");
-      el.style.setProperty("--i", i++);
-      els.scenes.appendChild(el);
-    });
-    (cfg.apps || []).forEach((a) => {
-      const el = tile(a, "app");
-      el.style.setProperty("--i", i++);
-      els.apps.appendChild(el);
-    });
+    (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
+    (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
   } catch (e) {
     flash(`config error: ${e.message}`);
     console.error(e);

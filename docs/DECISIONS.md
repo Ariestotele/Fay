@@ -114,3 +114,15 @@ config-driven and in scope.
 Owner wants any request, question, or expected instruction rendered as a
 **highlighted boxed panel** — a bordered Markdown table with a titled header row
 (🔔) — for maximum visibility. This is the current convention.
+
+### 2026-06-23 — Phase 6: the Heart (JARVIS/bubble HUD)
+Owner-approved redesign into a centered, organic "Heart": a full-monitor
+translucent overlay (wallpaper shows through, `backdrop` alpha) with a `<canvas>`
+particle field — layered multi-speed rings + inner set + a pulsing particle
+sphere. The sphere is the open/close button (rest ↔ tiles bloom). Built in plain
+canvas (no libs) for a light footprint; rendering pauses while hidden. Accent is
+config-driven with `accent: "auto"` matching the live Windows accent color
+(`get_accent_color`), `backdrop` controls see-through. Window is now
+alwaysOnTop + skipTaskbar + transparent, sized to the active monitor on show.
+Mouse-button summon (Mouse5) still parked. Tile grid kept (centered chips) for
+usability rather than fully orbital.

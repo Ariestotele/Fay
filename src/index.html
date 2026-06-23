@@ -7,31 +7,32 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="deck">
-      <header class="deck__head">
-        <div class="brand">
-          <span class="brand__mark">⟡</span>
-          <span class="brand__name" id="brandName">Fay</span>
-          <span class="brand__tag" id="brandTag">command deck</span>
-        </div>
-        <div class="clock" id="clock">--:--</div>
-      </header>
+    <canvas id="heart"></canvas>
 
-      <section class="group">
-        <h2 class="group__label">scenes</h2>
-        <div class="grid" id="scenes"></div>
-      </section>
+    <div class="hud">
+      <div class="brand" id="brand">FAY</div>
 
-      <section class="group">
-        <h2 class="group__label">apps</h2>
-        <div class="grid" id="apps"></div>
-      </section>
+      <button class="core" id="core" aria-label="Open Fay"></button>
+      <div class="clock" id="clock">--:--</div>
 
-      <footer class="deck__foot">
-        <span id="status">ready</span>
-        <span id="monitors" class="foot__monitors"></span>
-      </footer>
-    </main>
+      <div class="deck" id="deck">
+        <section class="group">
+          <h2 class="group__label">scenes</h2>
+          <div class="grid" id="scenes"></div>
+        </section>
+        <section class="group">
+          <h2 class="group__label">apps</h2>
+          <div class="grid" id="apps"></div>
+        </section>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <span id="status">ready</span>
+      <span id="monitors"></span>
+    </footer>
+
+    <script src="heart.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

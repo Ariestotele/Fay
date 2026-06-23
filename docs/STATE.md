@@ -2,9 +2,21 @@
 
 > Update this at the end of every session. New chats read this first.
 
-**Last updated:** 2026-06-21
-**Current phase:** Phases 1–4 merged. Phase 5 (autostart at login) in PR.
-Awaiting owner's Windows runtime check + PowerToys Workspace creation.
+**Last updated:** 2026-06-23
+**Current phase:** Phases 1–5 merged. **Phase 6 (the Heart HUD) built — in PR**
+(owner-approved design). Awaiting owner's Windows runtime check + PowerToys
+Workspace creation.
+
+## 🎨 Phase 6 design — "Fay's Heart" (proposed, not yet built)
+
+- Background **"Fay's Heart"**: a ring/torus made of **hundreds of mini particles
+  orbiting** in a wavy band — AI-mind style — with a heartbeat pulse (the band
+  breathes; particles drift/swirl). Not liquid, not techy reactor: particle cloud.
+- **Tiles layer on top** of the heart, centered in the calm dark middle of the ring.
+- Palette: deep blue/teal, or `accent: "auto"` to match the Windows accent color.
+- Full-screen translucent overlay on the **active monitor** (not spanning both).
+- Likely a lightweight `<canvas>` particle system (a few hundred points) rather
+  than SVG, for smooth motion. Concept mockups rendered for owner review.
 
 ## ✅ Done
 
@@ -70,10 +82,20 @@ CI compiles the app, but these are runtime behaviors to confirm on Windows:
   parses + re-registers it at load. `Ctrl+Alt+Space` is the fallback.
 - Keyboard-only; mouse-button summon still needs the deferred mouse hook.
 
-## ✅ Phase 5 (in PR) — autostart at login
+## ✅ Phase 5 (merged) — autostart at login
 
 - `app.autostart` (bool) in `apps.config.json` registers/unregisters Fay at login
   via `tauri-plugin-autostart`; `set_autostart` command applies it on load.
+
+## ✅ Phase 6 (in PR) — the Heart (JARVIS/bubble HUD)
+
+- Full-monitor translucent overlay; wallpaper shows through (`app.backdrop`).
+- `<canvas>` particle Heart (`heart.js`): layered multi-speed rings + inner set
+  + pulsing particle sphere. Sphere = the open button (rest ↔ tiles bloom).
+- Accent config-driven: `app.accent` `"auto"` → live Windows accent
+  (`get_accent_color`), or a fixed hex.
+- Window: alwaysOnTop + skipTaskbar + transparent, sized to active monitor.
+- Render pauses while hidden (cheap). `docs/ui-preview.*` is now outdated.
 
 ## 🧭 Later
 
