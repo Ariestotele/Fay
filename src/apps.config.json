@@ -4,7 +4,9 @@
     "tagline": "command deck",
     "columns": 4,
     "hotkey": "Ctrl+Alt+Space",
-    "autostart": false
+    "autostart": false,
+    "accent": "auto",
+    "backdrop": 0.62
   },
   "scenes": [
     {

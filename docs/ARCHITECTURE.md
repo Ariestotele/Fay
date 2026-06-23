@@ -38,7 +38,21 @@ launch(target, elevated)  // un-elevated: cmd /C start "" <target>
 list_monitors()           // current display layout (for the footer readout)
 hide_window()             // Escape-to-hide
 set_audio_output(device)  // set default playback device (Console+Multimedia roles)
+set_summon_hotkey(accel)  // re-register the summon hotkey from config
+set_autostart(enabled)    // launch-at-login toggle
+get_accent_color()        // Windows accent color (#rrggbb) for accent: "auto"
 ```
+
+### The Heart (HUD)
+
+The frontend is a full-monitor translucent overlay (`fill_active_monitor` sizes
+the window to the active display; `transparent` + a `backdrop` alpha let the
+wallpaper show through, dimmed). The centerpiece is a `<canvas>` particle field
+(`heart.js`): layered multi-speed rings + an inner set + a pulsing particle
+sphere. The sphere is the **button** — click it to bloom the tiles (`body.open`);
+Esc / clicking the backdrop collapses back to rest. Rendering pauses on window
+blur, so it costs nothing while hidden. Accent comes from `app.accent` —
+`"auto"` pulls the live Windows accent via `get_accent_color`.
 
 ### Scene audio output (optional)
 

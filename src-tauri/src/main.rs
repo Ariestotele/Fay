@@ -17,11 +17,22 @@ struct MonitorInfo {
     scale: f64,
 }
 
+/// Resize/move the window to fill the monitor it's currently on (HUD overlay).
+fn fill_active_monitor(window: &WebviewWindow) {
+    if let Ok(Some(m)) = window.current_monitor() {
+        let p = m.position();
+        let s = m.size();
+        let _ = window.set_position(tauri::PhysicalPosition { x: p.x, y: p.y });
+        let _ = window.set_size(tauri::PhysicalSize { width: s.width, height: s.height });
+    }
+}
+
 /// Show the window if hidden, hide it if visible. Used by the hotkey + tray.
 fn toggle_window(window: &WebviewWindow) {
     if window.is_visible().unwrap_or(false) {
         let _ = window.hide();
     } else {
+        fill_active_monitor(window);
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -159,6 +170,29 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     }
 }
 
+/// Read the Windows accent color as `#rrggbb` so the UI can match the system theme.
+#[tauri::command]
+fn get_accent_color() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let ps = r#"$c=(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\DWM' -Name AccentColor -ErrorAction Stop).AccentColor; '#{0:x2}{1:x2}{2:x2}' -f ($c -band 255),(($c -shr 8) -band 255),(($c -shr 16) -band 255)"#;
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", ps])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if s.len() >= 7 {
+            Ok(s)
+        } else {
+            Err("could not read accent color".into())
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("accent color is only available on Windows".into())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(
@@ -182,7 +216,8 @@ fn main() {
             hide_window,
             set_audio_output,
             set_summon_hotkey,
-            set_autostart
+            set_autostart,
+            get_accent_color
         ])
         .setup(|app| {
             // Summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
@@ -230,6 +265,11 @@ fn main() {
                         let _ = wc.hide();
                     }
                 });
+            }
+
+            // Make the initial window a full-monitor overlay.
+            if let Some(w) = app.get_webview_window("main") {
+                fill_active_monitor(&w);
             }
 
             Ok(())
