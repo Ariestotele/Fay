@@ -95,7 +95,7 @@ CI compiles the app, but these are runtime behaviors to confirm on Windows:
 - Accent config-driven: `app.accent` `"auto"` → live Windows accent
   (`get_accent_color`), or a fixed hex.
 - Window: alwaysOnTop + skipTaskbar + transparent, sized to active monitor.
-- Render pauses while hidden (cheap). `docs/ui-preview.*` is now outdated.
+- Render pauses while hidden (cheap). `docs/ui-preview.*` shows the Heart.
 
 ## 🧭 Later
 
