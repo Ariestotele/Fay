@@ -322,6 +322,119 @@ fn show_window(app: tauri::AppHandle) {
     }
 }
 
+/// Extract the real icon for a tile's target and return it as a PNG data URL.
+///
+/// Resolves env vars, `.lnk` shortcuts (via WScript.Shell) and bare commands on
+/// PATH (`Get-Command`), then uses `Icon::ExtractAssociatedIcon`. Protocol
+/// targets (`steam://`, `ms-phone:`) have no icon and return Err so the UI
+/// keeps the glyph. Results are cached as PNG files in the app cache dir.
+#[tauri::command]
+fn get_app_icon(app: tauri::AppHandle, target: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        // cache key: a cheap stable hash of the target string
+        let mut h: u64 = 1469598103934665603;
+        for b in target.bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(1099511628211);
+        }
+        let cache_dir = app
+            .path()
+            .app_cache_dir()
+            .map_err(|e| e.to_string())?
+            .join("icons");
+        let cached = cache_dir.join(format!("{h:016x}.png"));
+        if let Ok(bytes) = std::fs::read(&cached) {
+            return Ok(format!("data:image/png;base64,{}", b64(&bytes)));
+        }
+
+        let safe = target.replace('\'', "''");
+        let ps = format!(
+            r#"$t=[Environment]::ExpandEnvironmentVariables('{safe}')
+if ($t -match '^[a-zA-Z][a-zA-Z0-9+.-]*:' -and -not (Test-Path -LiteralPath $t)) {{ exit 2 }}
+if ($t -like '*.lnk' -and (Test-Path -LiteralPath $t)) {{ $s=(New-Object -ComObject WScript.Shell).CreateShortcut($t); if ($s.TargetPath) {{ $t=$s.TargetPath }} }}
+if (-not (Test-Path -LiteralPath $t)) {{ $c=Get-Command $t -ErrorAction SilentlyContinue; if ($c -and $c.Source) {{ $t=$c.Source }} }}
+if (-not (Test-Path -LiteralPath $t)) {{ exit 3 }}
+Add-Type -AssemblyName System.Drawing
+$ico=[System.Drawing.Icon]::ExtractAssociatedIcon($t)
+if (-not $ico) {{ exit 4 }}
+$bmp=$ico.ToBitmap(); $ms=New-Object IO.MemoryStream
+$bmp.Save($ms,[System.Drawing.Imaging.ImageFormat]::Png)
+[Convert]::ToBase64String($ms.ToArray())"#
+        );
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err(format!("no icon for {target}"));
+        }
+        let b64s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if b64s.is_empty() {
+            return Err(format!("no icon for {target}"));
+        }
+        // cache it (best effort)
+        if let Ok(bytes) = b64_decode(&b64s) {
+            let _ = std::fs::create_dir_all(&cache_dir);
+            let _ = std::fs::write(&cached, bytes);
+        }
+        Ok(format!("data:image/png;base64,{b64s}"))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, target);
+        Err("icons are only available on Windows".into())
+    }
+}
+
+// Tiny base64 helpers (avoid pulling in a crate for one use).
+fn b64(bytes: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut s = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    for chunk in bytes.chunks(3) {
+        let n = chunk.len();
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let v = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
+        s.push(T[(v >> 18) as usize & 63] as char);
+        s.push(T[(v >> 12) as usize & 63] as char);
+        s.push(if n > 1 { T[(v >> 6) as usize & 63] as char } else { '=' });
+        s.push(if n > 2 { T[v as usize & 63] as char } else { '=' });
+    }
+    s
+}
+fn b64_decode(s: &str) -> Result<Vec<u8>, ()> {
+    fn val(c: u8) -> Result<u32, ()> {
+        Ok(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return Err(()),
+        } as u32)
+    }
+    let bytes: Vec<u8> = s.bytes().filter(|c| !c.is_ascii_whitespace()).collect();
+    let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
+    for chunk in bytes.chunks(4) {
+        if chunk.len() < 4 {
+            return Err(());
+        }
+        let pad = chunk.iter().filter(|&&c| c == b'=').count();
+        let mut v = 0u32;
+        for &c in chunk {
+            v = (v << 6) | if c == b'=' { 0 } else { val(c)? };
+        }
+        out.push((v >> 16) as u8);
+        if pad < 2 {
+            out.push((v >> 8) as u8);
+        }
+        if pad < 1 {
+            out.push(v as u8);
+        }
+    }
+    Ok(out)
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(HotkeyState::default())
@@ -372,7 +485,8 @@ fn main() {
             load_config,
             save_config,
             config_file_path,
-            show_window
+            show_window,
+            get_app_icon
         ])
         .setup(|app| {
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
