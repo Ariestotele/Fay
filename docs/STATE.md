@@ -3,9 +3,10 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** Phases 1–8 merged to `main` (all CI-green). **Phase 9
-(installed-build readiness) in PR** — this is the artifact the owner should
-install for the first runtime test. Build-day queue in progress (see Pipeline).
+**Current phase:** Phases 1–9 merged to `main` (all CI-green). **Phases 10–11
+(keyboard launch/filter + Release workflow) in PR.** The Phase 9 merge's
+installer is the first build the owner should install. Build-day queue in
+progress (see Pipeline).
 
 ## ✅ Done (all merged)
 
@@ -21,6 +22,8 @@ install for the first runtime test. Build-day queue in progress (see Pipeline).
 | 7 | CI-built NSIS installer artifact on every push/PR (`Fay-windows-installer`) — test without a toolchain |
 | 8 | Direct scene/app hotkeys — per-tile `hotkey` fires the tile (with `audioOut`) without opening Fay; unified `HotkeyState` |
 | 9 | Installed-build readiness — user-editable config seeded to `%APPDATA%\com.fay.hub\apps.config.json` (tray: Open config / Reload), starts hidden (`startHidden`), amber `warn()` surfacing in the footer (in PR) |
+| 10 | Number-key launch (1–9) + type-to-filter with Enter-to-fire, Esc clears; frontend only (in PR) |
+| 11 | Release workflow — `v*` tag builds the installer and publishes it on the GitHub Releases page (in PR; first tag `v0.1.0`) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -46,9 +49,7 @@ install for the first runtime test. Build-day queue in progress (see Pipeline).
 
 | Feature | Value | Notes |
 | :-- | :-- | :-- |
-| Number-key launch + type-to-filter | med | frontend-only quick wins — **next** |
-| GitHub Release workflow (v0.1.0) | med | installer attached to a Releases page |
-| Real app icons | high | extract each app's icon instead of glyphs |
+| Real app icons | high | extract each app's icon instead of glyphs — **next** |
 | Per-machine profiles | med | different paths per PC; fixes absolute-path portability |
 | Running-app indicator | med | dot on apps already open |
 | First-run path picker | med | "browse…" to capture exe paths |

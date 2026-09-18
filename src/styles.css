@@ -103,6 +103,17 @@ body.open .clock { opacity: 0; }
 .tile:active { transform: translateY(0) scale(0.985); }
 .tile__glyph { color: var(--accent); font-size: 18px; text-shadow: 0 0 12px var(--accent); }
 .tile__name { font-size: 12.5px; letter-spacing: 0.03em; }
+.tile__idx { color: var(--dim); font-size: 10px; }
+.tile__idx:not(:empty)::after { content: " · "; }
+.tile.is-hidden { display: none; }
+
+.filter {
+  min-height: 18px;
+  font-size: 12px; letter-spacing: 0.14em;
+  color: var(--accent);
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.filter.is-active { opacity: 0.9; }
 .tile__hint { font-size: 9.5px; color: var(--dim); line-height: 1.3; }
 .tile__badge {
   position: absolute; top: 8px; right: 8px;
