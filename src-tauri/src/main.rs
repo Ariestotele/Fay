@@ -561,8 +561,9 @@ mod mouse_summon {
                 {
                     if let Some(app) = APP.get() {
                         let app = app.clone();
+                        let inner = app.clone();
                         let _ = app.run_on_main_thread(move || {
-                            if let Some(w) = app.get_webview_window("main") {
+                            if let Some(w) = inner.get_webview_window("main") {
                                 super::toggle_window(&w);
                             }
                         });
