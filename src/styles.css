@@ -73,6 +73,7 @@ body.open .core { opacity: 0; pointer-events: none; }
 body.open .clock { opacity: 0; }
 
 .group { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.group:has(.grid:empty) { display: none; }
 .group__label {
   font-size: 10px; letter-spacing: 0.42em; text-transform: uppercase; color: var(--dim);
 }
@@ -123,6 +124,14 @@ body.open .clock { opacity: 0; }
   opacity: 0; transition: opacity 0.2s ease;
 }
 .filter.is-active { opacity: 0.9; }
+.filter__kw { color: var(--txt); }
+.filter__ans { margin-left: 14px; color: var(--txt); text-shadow: 0 0 12px var(--accent); }
+.filter__hint { margin-left: 14px; font-size: 9.5px; color: var(--dim); letter-spacing: 0.1em; }
+
+/* destructive tile armed — press again within 3 s */
+.tile.is-confirm { border-color: #ffcf6b; box-shadow: 0 0 24px -6px #ffcf6b; }
+.tile.is-confirm .tile__name::after { content: " · again?"; color: #ffcf6b; font-size: 10px; }
+.tile__kw { text-transform: none; }
 .tile__hint { font-size: 9.5px; color: var(--dim); line-height: 1.3; padding-right: 64px; }
 .tile__badge {
   position: absolute; top: 8px; right: 8px;

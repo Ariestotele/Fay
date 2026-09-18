@@ -245,3 +245,27 @@ main thread via `run_on_main_thread`, and returns 1 to swallow the click. The
 combo lives in a static `Mutex` set by `set_mouse_summon`; the hook is
 installed once at startup and is inert until a combo is set. Windows-only
 (`cfg(windows)` dependency and module).
+
+### 2026-09-18 — Phase 17 (batch 1): tile kinds, packs, quicklinks, calculator
+Nine small features in one PR, grouped because they share one change: a tile
+is no longer just a `target`. Every tile now resolves to a `TileAction`
+(`kind` = launch | system | media | snippet) that both the click path (`fire`)
+and direct hotkeys go through, so nothing can behave differently between the
+two. Decisions: (1) `system` actions are a **fixed table** in Rust — the config
+picks a name, never a command string, so a shared config can't run arbitrary
+shell; (2) shutdown / restart / logoff / hibernate need a **second press within
+3 s** by default (`confirm`), because number keys make a mis-fire too easy;
+(3) media keys and the snippet paste use `SendInput` with the real virtual
+keys, and the clipboard is written natively (no PowerShell start-up lag);
+(4) the paste waits for the user's modifiers to be released so a snippet
+hotkey doesn't turn Ctrl+V into Ctrl+Alt+V; (5) presets live in
+`src/packs.json` and are opted into with `packs: [...]`, appended to a third
+group `system`, and a pack tile yields to a user tile with the same id;
+(6) quicklinks are any `target` containing `{query}` plus a `keyword`
+(default: id) — typed as `kw query`; (7) the calculator / converter is a small
+hand-written parser (no `eval`) and lines that start with a digit need a `=`
+prefix because bare digits fire tiles; currency is deliberately left out
+(needs network); (8) structural config validation runs on every load and, like
+a syntax error (now reported with line/col), shows the window so the message
+is seen; (9) the overlay opens on the monitor **under the cursor** by default
+(`summonOn`), using `cursor_position` + `monitor_from_point`.

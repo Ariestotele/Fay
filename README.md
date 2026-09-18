@@ -29,6 +29,10 @@ Every push to `main` also produces a fresh installer under
 | **Scenes** | One tile launches a whole window layout across both screens (via a [PowerToys Workspaces](https://learn.microsoft.com/windows/powertoys/workspaces) shortcut), and can switch your audio output as it does. |
 | **Direct hotkeys** | `Ctrl+Alt+1/2/3` fire scenes without even opening Fay. Any tile can have one. |
 | **Keyboard-fast** | Deck open: `1–9` fires a tile, typing filters, `Enter` fires the first match, `Esc` backs out. |
+| **Quicklinks** | `yt lofi` ⏎ opens a YouTube search. Any URL with `{query}` becomes one. |
+| **Calculator** | `= 1440*0.62` → `892.8`, `= 5 mi to km` → `8.04672 km`. Enter copies the answer. |
+| **System & media tiles** | Lock, Sleep, Shut down (press twice), Play/Pause, Volume ± — ready-made packs, or your own. |
+| **Snippets** | A tile that pastes a saved text into whatever app is in front. |
 | **Real icons** | Each tile shows its app's actual icon, extracted and cached automatically. |
 | **Running dot** | Apps already open get a glowing dot, so a scene doesn't relaunch them by surprise. |
 | **Accent auto** | Colors follow your Windows accent color (or pin a hex). |
@@ -54,8 +58,11 @@ Notepad. Save, then tray › **Reload config**.
   ],
   "apps": [
     { "id": "zen",   "name": "Zen",   "glyph": "◯", "target": "%LOCALAPPDATA%\\Programs\\zen\\zen.exe" },
-    { "id": "steam", "name": "Steam", "glyph": "▸", "target": "steam://open/main" }
+    { "id": "steam", "name": "Steam", "glyph": "▸", "target": "steam://open/main" },
+    { "id": "yt",    "name": "YouTube", "keyword": "yt", "target": "https://www.youtube.com/results?search_query={query}" },
+    { "id": "sig",   "name": "Sign-off", "kind": "snippet", "text": "Best regards,\nMe" }
   ],
+  "packs": ["power", "media"],
   "machines": {
     "DESKTOP-GAMING": { "tiles": { "zen": { "target": "D:\\Apps\\Zen\\zen.exe" } } }
   }
@@ -72,6 +79,14 @@ Notepad. Save, then tray › **Reload config**.
 | `backdrop` | `app` | 0–1, how much the wallpaper is dimmed behind the Heart. |
 | `startHidden` | `app` | Start in the tray (default `true`). |
 | `autostart` | `app` | Launch Fay at login. |
+| `summonOn` | `app` | `"cursor"` (default) opens Fay on the monitor under the mouse; `"current"` keeps the last one. |
+| `packs` | root | Preset tile sets: `power`, `media`, `tools`, `settings`, `links`. See [docs/SETUP.md](docs/SETUP.md). |
+| `system` | root | A third tile group, next to `scenes` and `apps`. |
+| `kind` | tile | `launch` (default), `system`, `media` or `snippet`. |
+| `action` | tile | `system`: `lock sleep hibernate restart shutdown logoff recycle darkmode`. `media`: `playpause next prev stop mute volup voldown`. |
+| `text` / `paste` | tile | Snippet text; `"paste": false` copies without pasting. |
+| `keyword` | tile | Quicklink keyword for a `target` containing `{query}` (defaults to `id`). |
+| `confirm` | tile | Require a second press within 3 s (default on for shutdown / restart / logoff / hibernate). |
 | `target` | tile | An exe path, a command on PATH, a `.lnk`, or a URL / protocol (`steam://`, `ms-phone:`). `%ENV%` vars expand. |
 | `hotkey` | tile | Fire this tile globally, without opening Fay. |
 | `audioOut` | tile | Switch the default playback device first (needs [SoundVolumeView](https://www.nirsoft.net/utils/sound_volume_view.html) on PATH). |
@@ -105,4 +120,4 @@ The project's working memory is in `docs/`: **STATE.md** (what's done / next),
 
 ## Status
 
-Sixteen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
+Seventeen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).

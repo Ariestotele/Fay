@@ -18,17 +18,264 @@ struct MonitorInfo {
     scale: f64,
 }
 
-/// A global hotkey bound directly to a tile (scene or app): pressing it fires
-/// the tile's launch without opening Fay.
-#[derive(Clone, serde::Deserialize)]
+/// What a tile does when fired. One shape for every tile kind, shared by clicks
+/// (the `fire` command) and direct hotkeys, so both paths behave identically.
+///
+/// - `launch` (default): `target` is an exe / command / .lnk / URL.
+/// - `system`:  `action` is lock / sleep / hibernate / restart / shutdown /
+///              logoff / recycle / darkmode.
+/// - `media`:   `action` is playpause / next / prev / stop / mute / volup / voldown.
+/// - `snippet`: `text` is copied to the clipboard and (unless `paste: false`)
+///              pasted into the foreground app with Ctrl+V.
+#[derive(Clone, Default, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HotkeyBinding {
-    accelerator: String,
-    target: String,
+struct TileAction {
+    #[serde(default)]
+    kind: String,
+    #[serde(default)]
+    target: Option<String>,
     #[serde(default)]
     elevated: bool,
     #[serde(default)]
     audio_out: Option<String>,
+    #[serde(default)]
+    action: Option<String>,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    paste: Option<bool>,
+}
+
+/// A global hotkey bound directly to a tile: pressing it performs the tile's
+/// action without opening Fay.
+#[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HotkeyBinding {
+    accelerator: String,
+    #[serde(flatten)]
+    action: TileAction,
+}
+
+/// Perform a tile action. The optional `audioOut` switch runs first and is
+/// best-effort: its error is returned as a warning (`Ok(Some(..))`) so the
+/// launch itself still happens.
+fn perform(a: &TileAction) -> Result<Option<String>, String> {
+    let mut warning = None;
+    if let Some(dev) = a.audio_out.as_deref().filter(|d| !d.is_empty()) {
+        if let Err(e) = do_set_audio_output(dev) {
+            warning = Some(format!("audio: {e}"));
+        }
+    }
+    match a.kind.as_str() {
+        "system" => do_system_action(a.action.as_deref().unwrap_or(""))?,
+        "media" => do_media_key(a.action.as_deref().unwrap_or(""))?,
+        "snippet" => do_paste_text(a.text.as_deref().unwrap_or(""), a.paste.unwrap_or(true))?,
+        _ => match a.target.as_deref().filter(|t| !t.is_empty()) {
+            Some(t) => do_launch(t, a.elevated)?,
+            None => return Err("tile has no target".into()),
+        },
+    }
+    Ok(warning)
+}
+
+/// Fire a tile from the UI. Async: every branch shells out or sleeps.
+#[tauri::command]
+async fn fire(action: TileAction) -> Result<Option<String>, String> {
+    perform(&action)
+}
+
+/// Fixed table of system commands. Nothing here takes user input, so a tile
+/// can only ever run one of these exact commands.
+fn do_system_action(action: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        fn ps(script: &str) -> (&str, Vec<&str>) {
+            ("powershell", vec!["-NoProfile", "-NonInteractive", "-Command", script])
+        }
+        let (prog, args): (&str, Vec<&str>) = match action {
+            "lock" => ("rundll32.exe", vec!["user32.dll,LockWorkStation"]),
+            // The .NET call sleeps reliably; the popular rundll32 SetSuspendState
+            // one-liner hibernates instead when hibernation is enabled.
+            "sleep" => ps("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState('Suspend',$false,$false)"),
+            "hibernate" => ("shutdown", vec!["/h"]),
+            "restart" => ("shutdown", vec!["/r", "/t", "0"]),
+            "shutdown" => ("shutdown", vec!["/s", "/t", "0"]),
+            "logoff" => ("shutdown", vec!["/l"]),
+            "recycle" => ps("Clear-RecycleBin -Force -ErrorAction SilentlyContinue"),
+            "darkmode" => ps(r"$k='HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'; $n=1-[int](Get-ItemProperty -Path $k -Name AppsUseLightTheme -ErrorAction SilentlyContinue).AppsUseLightTheme; Set-ItemProperty -Path $k -Name AppsUseLightTheme -Value $n -Type DWord; Set-ItemProperty -Path $k -Name SystemUsesLightTheme -Value $n -Type DWord"),
+            _ => return Err(format!("unknown system action '{action}'")),
+        };
+        cmd(prog).args(args).spawn().map_err(|e| format!("{action}: {e}"))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = action;
+        Err("system actions are only implemented on Windows".into())
+    }
+}
+
+/// Is a virtual key currently held? (modifier checks for the hook + paste)
+#[cfg(target_os = "windows")]
+fn key_down(vk: u16) -> bool {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    unsafe { (GetAsyncKeyState(vk as i32) as u16 & 0x8000) != 0 }
+}
+
+/// Synthesize one key press/release with SendInput.
+#[cfg(target_os = "windows")]
+fn send_vk(vk: u16, down: bool) {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    };
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: if down { 0 } else { KEYEVENTF_KEYUP },
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    unsafe {
+        SendInput(1, &input, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Tap a key (down + up).
+#[cfg(target_os = "windows")]
+fn tap_vk(vk: u16) {
+    send_vk(vk, true);
+    send_vk(vk, false);
+}
+
+/// Media / volume keys, sent as the real multimedia virtual keys so whatever is
+/// playing responds (Spotify, browser, game) exactly like a keyboard's keys.
+fn do_media_key(action: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            VK_MEDIA_NEXT_TRACK, VK_MEDIA_PLAY_PAUSE, VK_MEDIA_PREV_TRACK, VK_MEDIA_STOP,
+            VK_VOLUME_DOWN, VK_VOLUME_MUTE, VK_VOLUME_UP,
+        };
+        let vk = match action {
+            "playpause" | "play" | "pause" => VK_MEDIA_PLAY_PAUSE,
+            "next" => VK_MEDIA_NEXT_TRACK,
+            "prev" | "previous" => VK_MEDIA_PREV_TRACK,
+            "stop" => VK_MEDIA_STOP,
+            "mute" => VK_VOLUME_MUTE,
+            "volup" => VK_VOLUME_UP,
+            "voldown" => VK_VOLUME_DOWN,
+            _ => return Err(format!("unknown media action '{action}'")),
+        };
+        tap_vk(vk);
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = action;
+        Err("media keys are only implemented on Windows".into())
+    }
+}
+
+/// Put text on the clipboard as CF_UNICODETEXT (native; no PowerShell start-up).
+fn set_clipboard_text(text: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::System::DataExchange::{
+            CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+        };
+        use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+        const CF_UNICODETEXT: u32 = 13;
+        let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        unsafe {
+            // Another app may hold the clipboard for a moment; retry briefly.
+            let mut opened = false;
+            for _ in 0..10 {
+                if OpenClipboard(std::ptr::null_mut()) != 0 {
+                    opened = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            if !opened {
+                return Err("clipboard is busy".into());
+            }
+            EmptyClipboard();
+            let h = GlobalAlloc(GMEM_MOVEABLE, wide.len() * 2);
+            if h.is_null() {
+                CloseClipboard();
+                return Err("clipboard: allocation failed".into());
+            }
+            let p = GlobalLock(h) as *mut u16;
+            if p.is_null() {
+                CloseClipboard();
+                return Err("clipboard: lock failed".into());
+            }
+            std::ptr::copy_nonoverlapping(wide.as_ptr(), p, wide.len());
+            GlobalUnlock(h);
+            // On success the system owns the memory; we must not free it.
+            let ok = !SetClipboardData(CF_UNICODETEXT, h).is_null();
+            CloseClipboard();
+            if !ok {
+                return Err("clipboard: set failed".into());
+            }
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = text;
+        Err("clipboard is only implemented on Windows".into())
+    }
+}
+
+#[tauri::command]
+async fn set_clipboard(text: String) -> Result<(), String> {
+    set_clipboard_text(&text)
+}
+
+/// Snippet: copy `text`, then (optionally) paste it into whatever app is in
+/// front with Ctrl+V. Waits for the user's modifier keys to be released first,
+/// otherwise a hotkey like Ctrl+Alt+S would turn the paste into Ctrl+Alt+V.
+fn do_paste_text(text: &str, paste: bool) -> Result<(), String> {
+    set_clipboard_text(text)?;
+    #[cfg(target_os = "windows")]
+    {
+        if paste {
+            use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+                VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+            };
+            for _ in 0..40 {
+                if ![VK_CONTROL, VK_MENU, VK_SHIFT, VK_LWIN, VK_RWIN].iter().any(|&k| key_down(k)) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            // Let the previous window take focus back after Fay hides.
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            send_vk(VK_CONTROL, true);
+            tap_vk(0x56); // V
+            send_vk(VK_CONTROL, false);
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = paste;
+    }
+    Ok(())
+}
+
+/// Which monitor the overlay appears on: under the cursor (default) or the one
+/// the window was last on. Set from `app.summonOn` via `set_summon_monitor`.
+static SUMMON_AT_CURSOR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+#[tauri::command]
+fn set_summon_monitor(mode: String) {
+    SUMMON_AT_CURSOR.store(mode.trim() != "current", std::sync::atomic::Ordering::Relaxed);
 }
 
 /// All registered global shortcuts: the summon combo plus per-tile bindings.
@@ -53,9 +300,19 @@ fn cmd(program: &str) -> std::process::Command {
     c
 }
 
-/// Resize/move the window to fill the monitor it's currently on (HUD overlay).
+/// Resize/move the window to fill a whole monitor (HUD overlay): the one under
+/// the mouse cursor by default, else the one the window is currently on.
 fn fill_active_monitor(window: &WebviewWindow) {
-    if let Ok(Some(m)) = window.current_monitor() {
+    let under_cursor = if SUMMON_AT_CURSOR.load(std::sync::atomic::Ordering::Relaxed) {
+        window
+            .cursor_position()
+            .ok()
+            .and_then(|p| window.monitor_from_point(p.x, p.y).ok().flatten())
+    } else {
+        None
+    };
+    let monitor = under_cursor.or_else(|| window.current_monitor().ok().flatten());
+    if let Some(m) = monitor {
         let p = m.position();
         let s = m.size();
         let _ = window.set_position(tauri::PhysicalPosition { x: p.x, y: p.y });
@@ -495,12 +752,11 @@ fn get_hostname() -> String {
 /// click is swallowed so the app under the cursor doesn't also act on it.
 #[cfg(target_os = "windows")]
 mod mouse_summon {
+    use super::key_down;
     use std::sync::{Mutex, OnceLock};
     use tauri::Manager;
     use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-        GetAsyncKeyState, VK_CONTROL, VK_MENU, VK_SHIFT,
-    };
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{VK_CONTROL, VK_MENU, VK_SHIFT};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         CallNextHookEx, GetMessageW, SetWindowsHookExW, MSG, MSLLHOOKSTRUCT, WH_MOUSE_LL,
         WM_XBUTTONDOWN,
@@ -542,10 +798,6 @@ mod mouse_summon {
         if let Ok(mut g) = COMBO.lock() {
             *g = combo;
         }
-    }
-
-    fn key_down(vk: u16) -> bool {
-        unsafe { (GetAsyncKeyState(vk as i32) as u16 & 0x8000) != 0 }
     }
 
     unsafe extern "system" fn hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -637,12 +889,9 @@ fn main() {
                         })
                     };
                     if let Some(b) = binding {
-                        // Off the event loop: the audio switch blocks for a moment.
+                        // Off the event loop: audio switch / paste block for a moment.
                         std::thread::spawn(move || {
-                            if let Some(dev) = &b.audio_out {
-                                let _ = do_set_audio_output(dev);
-                            }
-                            let _ = do_launch(&b.target, b.elevated);
+                            let _ = perform(&b.action);
                         });
                         return;
                     }
@@ -673,7 +922,10 @@ fn main() {
             get_app_icon,
             list_running,
             get_hostname,
-            set_mouse_summon
+            set_mouse_summon,
+            fire,
+            set_clipboard,
+            set_summon_monitor
         ])
         .setup(|app| {
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).

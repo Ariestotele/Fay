@@ -41,7 +41,22 @@ set_audio_output(device)  // set default playback device (Console+Multimedia rol
 set_summon_hotkey(accel)  // re-register the summon hotkey from config
 set_autostart(enabled)    // launch-at-login toggle
 get_accent_color()        // Windows accent color (#rrggbb) for accent: "auto"
+fire(action)              // perform any tile: launch / system / media / snippet
+set_clipboard(text)       // native CF_UNICODETEXT (calculator "Enter copies")
+set_summon_monitor(mode)  // "cursor" (monitor under the mouse) or "current"
 ```
+
+### Tile kinds (Phase 17)
+
+Every tile resolves to one `TileAction` `{kind, target, elevated, audioOut,
+action, text, paste}`; the frontend builds it (`actionOf`) both for clicks
+(`fire`) and for direct hotkeys (`register_item_hotkeys`), so the two paths are
+identical. `system` actions are a fixed command table in Rust (nothing from
+the config is interpolated into a shell); `media` and the snippet paste use
+`SendInput`; the clipboard is written natively. Preset tiles come from
+`src/packs.json` (`packs: [...]` in the config) and land in a third group,
+`system`. The filter bar doubles as a calculator / unit converter (`= …`) and
+as the quicklink prompt (`yt lofi`) — all in `app.js`, no backend.
 
 ### The Heart (HUD)
 
