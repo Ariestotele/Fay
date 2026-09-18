@@ -16,6 +16,7 @@ const els = {
   canvas: document.getElementById("heart"),
   filter: document.getElementById("filter"),
   timer: document.getElementById("timer"),
+  results: document.getElementById("results"),
 };
 
 const tauri = window.__TAURI__ || null;
@@ -31,7 +32,9 @@ const invoke =
 // close:   closes = ["Discord", "zen!"] processes to close ("!" = force)
 // folder:  children = [ tiles… ] opens a sub-deck
 // focus:   minutes = N starts the focus timer (action "stop" / "toggle")
-const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder", "focus"]);
+// clipboard: opens the clipboard history list
+// say:     text is spoken (voice); listen: tap-to-talk, say a tile's name
+const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder", "focus", "clipboard", "say", "listen"]);
 const SYSTEM_ACTIONS = new Set(["lock", "sleep", "hibernate", "restart", "shutdown", "logoff", "recycle", "darkmode"]);
 const MEDIA_ACTIONS = new Set(["playpause", "play", "pause", "next", "prev", "previous", "stop", "mute", "volup", "voldown"]);
 const CONFIRM_ACTIONS = new Set(["restart", "shutdown", "logoff", "hibernate"]);
@@ -64,6 +67,7 @@ function actionOf(item, query) {
     wait: item.wait != null ? Number(item.wait) : null,
     closes: kind === "close" && canClose(item) ? item.closes.map(String) : [],
     minutes: item.minutes != null ? Number(item.minutes) : null,
+    say: typeof item.say === "string" ? item.say : null,
   };
 }
 const stepOf = (s) => (s && s.wait != null && !s.kind && !s.target ? { kind: "wait", wait: Number(s.wait) } : actionOf(s || {}));
@@ -85,7 +89,7 @@ function allTiles(cfg) { const out = []; walkTiles(cfg, (t) => out.push(t)); ret
 
 // ---- open / rest state ----------------------------------------------------
 function openDeck() { document.body.classList.add("open"); refreshRunning(); heartStats(false); }
-function closeDeck() { document.body.classList.remove("open"); leaveFolders(); setFilter(""); heartStats(true); }
+function closeDeck() { document.body.classList.remove("open"); leaveFolders(); search.clipboard = false; setFilter(""); heartStats(true); }
 function isOpen() { return document.body.classList.contains("open"); }
 const heartStats = (v) => { if (window.Heart) window.Heart.setStatsVisible(v); };
 
@@ -199,6 +203,8 @@ function matchQuicklink(q) {
 function setFilter(q) {
   filterText = q.replace(/^\s+/, "");
   const raw = filterText;
+  // Results mode (files / bookmarks / clipboard) replaces the tile grid.
+  if (updateResults(raw)) return;
   currentQuicklink = matchQuicklink(raw);
   currentAnswer = currentQuicklink ? null : answerFor(raw);
 
@@ -226,6 +232,176 @@ function setFilter(q) {
   }
   renumber();
 }
+
+// ---- results mode: file search (">"), bookmarks ("@"), clipboard history ----
+// A provider turns the typed text into rows; rows replace the tile grid and
+// are picked with arrows + Enter (Shift+Enter = the row's alternate action).
+const search = { mode: null, rows: [], sel: 0, seq: 0, es: null, clipboard: false, bookmarks: true, files: true };
+const clipMode = () => search.clipboard;
+
+function updateResults(raw) {
+  let mode = null, q = raw;
+  if (clipMode()) { mode = "clipboard"; }
+  else if (raw.startsWith(">") && search.files) { mode = "files"; q = raw.slice(1).trim(); }
+  else if (raw.startsWith("@") && search.bookmarks) { mode = "bookmarks"; q = raw.slice(1).trim(); }
+  if (!mode) {
+    if (search.mode) { search.mode = null; renderResults(null); }
+    return false;
+  }
+  search.mode = mode;
+  currentQuicklink = null; currentAnswer = null;
+  const labels = { files: "files", bookmarks: "bookmarks", clipboard: "clipboard" };
+  els.filter.innerHTML = `<span class="filter__kw">${labels[mode]}</span> › ${escapeHtml(q)}`;
+  els.filter.classList.add("is-active");
+  for (const t of document.querySelectorAll(".tile")) t.classList.add("is-hidden");
+  const seq = ++search.seq;
+  const done = (rows) => { if (seq === search.seq) renderResults(rows); };
+  if (mode === "clipboard") { provideClipboard(q).then(done); return true; }
+  if (mode === "bookmarks") { provideBookmarks(q).then(done); return true; }
+  clearTimeout(search._t);
+  if (!q) { renderResults([]); return true; }
+  search._t = setTimeout(() => provideFiles(q).then(done), 180); // debounce typing
+  return true;
+}
+
+function renderResults(rows) {
+  search.rows = rows || [];
+  search.sel = 0;
+  document.body.classList.toggle("results", !!rows);
+  if (!rows) { els.results.innerHTML = ""; return; }
+  if (!rows.length) {
+    els.results.innerHTML = `<div class="row row--empty">${escapeHtml(search.emptyMsg || "no results")}</div>`;
+    return;
+  }
+  els.results.innerHTML = rows.slice(0, 12).map((r, i) => `
+    <button class="row${i === 0 ? " is-sel" : ""}" data-i="${i}">
+      <span class="row__icon">${escapeHtml(r.icon || "·")}</span>
+      <span class="row__text">${escapeHtml(r.text)}</span>
+      <span class="row__sub">${escapeHtml(r.sub || "")}</span>
+    </button>`).join("");
+  els.results.querySelectorAll(".row").forEach((el) => {
+    el.addEventListener("click", (e) => pickRow(Number(el.dataset.i), e.shiftKey));
+  });
+}
+
+function moveSel(d) {
+  if (!search.rows.length) return;
+  search.sel = Math.max(0, Math.min(Math.min(search.rows.length, 12) - 1, search.sel + d));
+  els.results.querySelectorAll(".row").forEach((el, i) => el.classList.toggle("is-sel", i === search.sel));
+}
+
+async function pickRow(i, alt) {
+  const r = search.rows[i];
+  if (!r) return;
+  try { await (alt && r.alt ? r.alt() : r.pick()); } catch (e) { warn(String(e)); }
+}
+
+const oneLine = (s, n) => { const t = String(s).replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+
+async function provideClipboard(q) {
+  if (!invoke) return [];
+  let list = [];
+  try { list = await invoke("clipboard_history"); } catch (e) { return []; }
+  const needle = q.toLowerCase();
+  search.emptyMsg = list.length ? "no match" : "clipboard history is empty — copy something";
+  return list.filter((t) => !needle || t.toLowerCase().includes(needle)).map((t) => ({
+    icon: "⎘", text: oneLine(t, 90),
+    sub: `${t.length} chars${t.includes("\n") ? ` · ${t.split("\n").length} lines` : ""}`,
+    pick: async () => { await invoke("hide_window"); await invoke("clipboard_pick", { text: t, paste: true }); },
+    alt: async () => { await invoke("clipboard_pick", { text: t, paste: false }); flash("copied"); },
+  }));
+}
+
+async function provideBookmarks(q) {
+  if (!invoke) return [];
+  let list = [];
+  try { list = await invoke("list_bookmarks", { refresh: false }); } catch (e) { warn(`bookmarks: ${e}`); return []; }
+  search.emptyMsg = list.length ? "no match" : "no browser bookmarks found (Zen / Firefox / Chrome / Edge / Brave)";
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = (b) => `${b.title} ${b.url}`.toLowerCase();
+  return list
+    .filter((b) => words.every((w) => hay(b).includes(w)))
+    .slice(0, 12)
+    .map((b) => ({
+      icon: "☆", text: b.title || b.url, sub: `${b.browser} · ${oneLine(b.url, 70)}`,
+      pick: () => fire({ name: b.title || b.url, target: b.url }),
+      alt: async () => { await invoke("set_clipboard", { text: b.url }); flash("url copied"); },
+    }));
+}
+
+async function provideFiles(q) {
+  if (!invoke) return [];
+  let list = [];
+  try { list = await invoke("search_files", { query: q, max: 12, es: search.es }); }
+  catch (e) { search.emptyMsg = String(e); return []; }
+  search.emptyMsg = "no files match";
+  return list.map((f) => ({
+    icon: f.dir ? "▮" : "▪", text: f.name, sub: oneLine(f.path, 90),
+    pick: () => fire({ name: f.name, target: f.path }),
+    alt: () => invoke("reveal", { path: f.path }),
+  }));
+}
+
+// ---- voice (Windows System.Speech via the backend) -------------------------
+const voice = { on: false, confirm: true, phrases: new Map() };
+window.__faySay = (text) => {
+  if (!voice.on || !invoke || !text) return;
+  invoke("say", { text }).catch(() => {});
+  if (window.Heart) window.Heart.talk(400 + String(text).length * 65);
+};
+window.__fayListening = () => {
+  if (window.Heart) window.Heart.listen(6000);
+  flash("listening…");
+};
+// Grammar: every tile name (+ "open/start/launch <name>"), "close <scene>",
+// and a few built-ins. Phrase → what to do.
+function buildVoiceGrammar(cfg) {
+  voice.phrases.clear();
+  const add = (phrase, fn) => { const k = phrase.toLowerCase().trim(); if (k && !voice.phrases.has(k)) voice.phrases.set(k, fn); };
+  for (const t of allTiles(cfg)) {
+    if (!t.name) continue;
+    const name = String(t.name).replace(/[^\w\s'+-]/g, " ").replace(/\s+/g, " ").trim();
+    if (!name) continue;
+    const go = () => fire(t);
+    add(name, go);
+    for (const v of ["open", "start", "launch"]) add(`${v} ${name}`, go);
+    if (canClose(t)) add(`close ${name}`, () => fireClose(t));
+  }
+  add("stop focus", () => focusStop(false));
+  add("clipboard", openClipboard);
+  add("close fay", () => { if (invoke) invoke("hide_window"); });
+  add("never mind", () => {});
+  return [...voice.phrases.keys()];
+}
+window.__fayHeard = (text, confidence, error) => {
+  if (window.Heart) window.Heart.quiet();
+  if (error) { warn(`voice: ${error}`); return; }
+  const key = String(text || "").toLowerCase().trim();
+  if (!key) { flash("didn't catch that"); return; }
+  const fn = voice.phrases.get(key);
+  if (!fn || confidence < 0.3) { flash(`heard "${text}"`); if (voice.confirm) window.__faySay("Sorry, I did not catch that."); return; }
+  flash(`✓ ${text}`);
+  if (voice.confirm && key !== "never mind") window.__faySay(key.startsWith("close ") ? `Closing ${key.slice(6)}` : `Opening ${key.replace(/^(open|start|launch) /, "")}`);
+  fn();
+};
+function startVoice(app, cfg) {
+  voice.on = app.voice === true;
+  voice.confirm = app.voiceConfirm !== false;
+  if (!invoke) return;
+  invoke("voice_config", { enabled: voice.on, rate: Number(app.voiceRate) || 0, name: app.voiceName || "" })
+    .then(() => { if (voice.on) return invoke("set_voice_grammar", { phrases: buildVoiceGrammar(cfg) }); })
+    .catch((e) => warn(`voice: ${e}`));
+}
+
+// Clipboard mode is a toggle (tile, hotkey, or a global hotkey via the backend).
+function openClipboard() {
+  if (!isOpen()) openDeck();
+  leaveFolders();
+  search.clipboard = true;
+  setFilter("");
+}
+function closeClipboard() { search.clipboard = false; setFilter(""); }
+window.__fayClipboard = openClipboard;
 
 // Fire the tile behind a DOM element, honoring Shift = teardown for scenes.
 function fireEl(el, shift) {
@@ -397,9 +573,14 @@ async function fire(item, query) {
   const kind = kindOf(item);
   if (kind === "folder") { openFolder(item); return; }
   if (kind === "focus") { fireFocus(item); return; }
+  if (kind === "clipboard") { openClipboard(); return; }
   if (kind === "launch" && !item.target) return;
+  if ((kind === "say" || kind === "listen") && !voice.on) { warn(`"${item.name}" needs "voice": true in app`); return; }
   const payload = actionOf(item, query);
-  await send(payload, `→ ${item.name}${query ? ` ▸ ${query.trim()}` : ""}${item.elevated ? " (admin)" : ""}`, item.name);
+  if (kind === "say" && window.Heart) window.Heart.talk(400 + String(item.text || "").length * 65);
+  const label = kind === "say" ? `“${oneLine(item.text || "", 60)}”` : kind === "listen" ? "listening…" : `→ ${item.name}${query ? ` ▸ ${query.trim()}` : ""}${item.elevated ? " (admin)" : ""}`;
+  await send(payload, label, item.name);
+  if (payload.say && window.Heart) window.Heart.talk(400 + payload.say.length * 65);
 }
 
 // Scene teardown: close the processes listed in `closes` (Shift+click / Shift+digit / ×).
@@ -558,8 +739,12 @@ function wireInput() {
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (isOpen()) { if (filterText) setFilter(""); else if (inFolder()) closeFolder(); else closeDeck(); }
-      else if (invoke) invoke("hide_window");
+      if (isOpen()) {
+        if (filterText) setFilter("");
+        else if (clipMode()) closeClipboard();
+        else if (inFolder()) closeFolder();
+        else closeDeck();
+      } else if (invoke) invoke("hide_window");
       return;
     }
     if (!isOpen()) {
@@ -568,6 +753,17 @@ function wireInput() {
     }
     // ---- deck is open ----
     const plain = !e.ctrlKey && !e.altKey && !e.metaKey;
+    // Results mode: arrows pick a row, Enter opens it, Shift+Enter = alternate.
+    if (search.mode) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { moveSel(e.key === "ArrowDown" ? 1 : -1); e.preventDefault(); return; }
+      if (e.key === "Enter") { pickRow(search.sel, e.shiftKey); e.preventDefault(); return; }
+      if (e.key === "Backspace") {
+        if (!filterText && clipMode()) closeClipboard(); else setFilter(filterText.slice(0, -1));
+        e.preventDefault(); return;
+      }
+      if (e.key.length === 1 && plain) { setFilter(filterText + e.key); e.preventDefault(); }
+      return;
+    }
     // Digits fire tiles only while nothing is typed; once the filter has text
     // (or starts with "=") they are part of it, so "= 1440*0.62" works.
     // Shift+digit on a scene with `closes` tears it down instead.
@@ -707,6 +903,9 @@ function validateConfig(cfg, packs) {
     if (k === "snippet" && typeof t.text !== "string") p.push(`${who} needs "text"`);
     if (k === "close" && !canClose(t)) p.push(`${who} needs "closes": ["process", …]`);
     if (k === "focus" && !(t.minutes > 0) && t.action !== "stop") p.push(`${who} needs "minutes": 25 (or "action": "stop")`);
+    if (k === "clipboard" && isStep) p.push(`${who}: a step can't open the clipboard`);
+    if (k === "say" && typeof t.text !== "string") p.push(`${who} needs "text" to say`);
+    if (t.say != null && typeof t.say !== "string") p.push(`${who}: "say" must be a string`);
     if (k === "multi") {
       if (!t.actions.length) p.push(`${who}: "actions" is empty`);
       t.actions.forEach((s, i) => {
@@ -819,6 +1018,14 @@ async function main() {
       invoke("set_autostart", { enabled: app.autostart }).catch((e) => warn(`autostart: ${e}`));
     }
     startStats(app);
+    // Search providers: clipboard watcher (memory only), Everything, bookmarks.
+    search.files = app.files !== false;
+    search.bookmarks = app.bookmarks !== false;
+    search.es = typeof app.everything === "string" ? app.everything : null;
+    if (invoke) {
+      invoke("set_clipboard_watch", { enabled: app.clipboard !== false, max: Number(app.clipboardMax) || 50 }).catch(() => {});
+      if (search.bookmarks) invoke("list_bookmarks", { refresh: false }).catch(() => {}); // warm the cache
+    }
 
     (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
     (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
@@ -844,6 +1051,8 @@ async function main() {
         .then((bad) => { if (bad && bad.length) warn(`hotkeys not bound: ${bad.join(", ")}`); })
         .catch((e) => warn(`item hotkeys: ${e}`));
     }
+
+    startVoice(app, cfg);
 
     if (problems.length) {
       warn(`config: ${problems.slice(0, 2).join(" · ")}${problems.length > 2 ? ` (+${problems.length - 2} more)` : ""}`);

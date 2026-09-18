@@ -353,6 +353,57 @@ makes a dedicated stop tile. When time is up the Heart pulses, a Windows toast
 appears (so you see it even with Fay hidden) and, once voice is enabled, Fay
 says so. The `focus` pack has Focus 25 / Focus 50 / Stop.
 
+## Search: files, bookmarks, clipboard history
+
+With the deck open, a prefix turns the filter line into a results list. Arrows
+move, **Enter** opens the selected row, **Shift+Enter** does the row's second
+action, Esc backs out.
+
+| Type | Searches | Enter | Shift+Enter |
+| :-- | :-- | :-- | :-- |
+| `> report 2025` | Files via [Everything](https://www.voidtools.com/) | open | reveal in Explorer |
+| `@ tauri docs` | Browser bookmarks (Zen · Firefox · LibreWolf · Floorp · Chrome · Edge · Brave · Vivaldi) | open in default browser | copy URL |
+| Clipboard tile / `Ctrl+Alt+V` | Clipboard history (type to filter) | paste into the app in front | copy only |
+
+**Files** need Everything running plus its command-line tool `es.exe`
+(download *ES* from the Everything site; put it on PATH or set
+`"everything": "C:\\tools\\es.exe"` in `app`). Results are sorted by date
+modified, newest first.
+
+**Bookmarks** are read from the browsers' own files: Chromium browsers'
+`Bookmarks` JSON, and for Zen / Firefox the daily `bookmarkbackups` file (so a
+bookmark added today may show up tomorrow). Cached for five minutes.
+`"bookmarks": false` turns it off.
+
+**Clipboard history** keeps the last 50 text copies **in memory only** (never
+on disk, gone when Fay quits); entries a password manager marks as
+"exclude from monitoring" are skipped. `"clipboard": false` disables the
+watcher, `"clipboardMax": 100` changes the size. A `kind: "clipboard"` tile (or
+its hotkey, even while Fay is hidden) opens the list.
+
+## Voice — Fay talks, and listens (offline)
+
+Built on Windows' own speech engine (`System.Speech`): nothing to install, no
+cloud, works offline. `"voice": true` in `app` turns it on (default in the
+starter config); `"voiceRate": 0` is speed (−10…10); `"voiceName"` picks an
+installed voice (Settings › Time & language › Speech lists them, e.g.
+`"Microsoft Zira Desktop"`); `"voiceConfirm": false` stops the spoken
+"Opening …" acknowledgement.
+
+**Spoken replies.** Any tile can carry `"say": "Game mode ready"` — spoken
+after it fires (click or hotkey). A `kind: "say"` tile / multi-action step
+speaks its `text`. The focus timer announces when it ends. The Heart's sphere
+wobbles while Fay speaks.
+
+**Tap-to-talk.** Press the *Listen* tile (or its hotkey, `Ctrl+Alt+L` in the
+starter config, which works even while Fay is hidden), wait for the Heart to
+breathe, and say a tile name: *"game"*, *"open discord"*, *"start focus 25"*,
+*"close game"* (for scenes with `closes`), *"clipboard"*, *"stop focus"*,
+*"close fay"*, *"never mind"*. Recognition uses a fixed grammar built from your
+tile names, so it's accurate even with a laptop mic, and Fay only listens for
+six seconds after you press — never continuously. The first *Listen* after
+start takes a second longer while the engine loads.
+
 ## Which monitor Fay opens on
 
 `"summonOn": "cursor"` (default) shows Fay on the monitor under the mouse;

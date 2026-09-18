@@ -47,7 +47,25 @@ set_summon_monitor(mode)  // "cursor" (monitor under the mouse) or "current"
 list_commands(dir?)       // scripts in the commands folder → tiles
 get_stats()               // CPU / RAM / NET via sysinfo (+ GPU via nvidia-smi)
 notify(title, body)       // Windows toast (focus timer done while hidden)
+set_clipboard_watch(on, max) / clipboard_history() / clipboard_pick(text, paste) / clipboard_clear()
+search_files(query, max, es?) // Everything es.exe; reveal(path) opens Explorer
+list_bookmarks(refresh?)  // Zen/Firefox jsonlz4 backups + Chromium Bookmarks JSON, 5-min cache
+voice_config(on, rate, name) / say(text) / listen() / set_voice_grammar(phrases)
 ```
+
+**Voice** is one persistent PowerShell process hosting `System.Speech`'s
+synthesizer and recognizer (started when `app.voice` is on, restarted on
+config change or if it dies). Rust talks to it over stdin with a tiny line
+protocol (`say <urlenc>`, `grammar <urlenc>`, `listen`, `stop`); a reader
+thread forwards `heard`/`error` lines to `window.__fayHeard`. The grammar is a
+`Choices` list of tile names built by the frontend, so recognition is
+constrained and accurate; listening is a single six-second `Recognize`, never
+continuous. `Heart.talk(ms)` / `Heart.listen(ms)` animate the sphere.
+
+**Results mode** (`app.js`): a filter prefix (`>` files, `@` bookmarks) or the
+clipboard toggle swaps the tile grid for a row list fed by an async provider
+(debounced, sequence-numbered so stale answers are dropped). Rows carry their
+own `pick` / `alt` closures, so adding a provider is one function.
 
 The Heart exposes `setStats`, `setStatsVisible`, `setProgress` (focus arc) and
 `pulse()` (a one-second burst used for "done" and, later, spoken replies).

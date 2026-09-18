@@ -10,7 +10,14 @@
     "accent": "auto",
     "backdrop": 0.62,
     "startHidden": true,
-    "stats": true
+    "stats": true,
+    "clipboard": true,
+    "bookmarks": true,
+    "everything": "",
+    "voice": true,
+    "voiceRate": 0,
+    "voiceName": "",
+    "voiceConfirm": true
   },
   "scenes": [
     {
@@ -29,6 +36,7 @@
       "target": "%USERPROFILE%\\Desktop\\Fay-Game.lnk",
       "audioOut": "Hyper X Cloud 3 Wireless (HyperX Cloud III Wireless)",
       "closes": ["Discord", "zen", "Taskmgr"],
+      "say": "Game mode ready. Audio on the headset.",
       "hint": "Game on the ASUS main · side screen quartered: Discord, Task Manager, Zen, LifeOS · audio → headset · Shift+click closes them"
     },
     {
@@ -60,7 +68,9 @@
     { "id": "winddown", "name": "Wind down", "glyph": "☾", "actions": [
       { "kind": "media", "action": "playpause" }, { "wait": 400 }, { "kind": "system", "action": "lock" }
     ], "hint": "pause music, then lock" },
-    { "id": "focus", "name": "Focus 25", "glyph": "◔", "kind": "focus", "minutes": 25, "hotkey": "Ctrl+Alt+F", "hint": "pomodoro · again to stop" }
+    { "id": "focus", "name": "Focus 25", "glyph": "◔", "kind": "focus", "minutes": 25, "hotkey": "Ctrl+Alt+F", "hint": "pomodoro · again to stop" },
+    { "id": "clip",  "name": "Clipboard", "glyph": "⎘", "kind": "clipboard", "hotkey": "Ctrl+Alt+V", "hint": "history · Enter pastes · type > for files, @ for bookmarks" },
+    { "id": "listen", "name": "Listen", "glyph": "◉", "kind": "listen", "hotkey": "Ctrl+Alt+L", "hint": "then say a tile name — “game”, “open discord”, “close game”" }
   ],
   "packs": ["power", "media"],
   "commands": true,

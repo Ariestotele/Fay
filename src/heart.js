@@ -13,6 +13,7 @@
   let progress = null;   // 0..1 focus-timer arc, or null
   let pulseT = 0;        // 1 → 0 burst (spoken reply, timer done, …)
   let showStats = true;
+  let talkUntil = 0, listenUntil = 0; // voice: speaking wobble / listening breath
 
   function hexToRgb(h) {
     h = (h || "").replace("#", "");
@@ -135,6 +136,8 @@
     ctx.globalCompositeOperation = "lighter";
     t += dt;
     pulseT = Math.max(0, pulseT - dt * 0.9);
+    if (t < talkUntil) pulseT = Math.max(pulseT, 0.25 + 0.35 * Math.abs(Math.sin(t * 11)));   // speaking
+    if (t < listenUntil) pulseT = Math.max(pulseT, 0.3 + 0.25 * Math.sin(t * 3));             // listening
     const bt = Math.min(1, beat(t) + pulseT);
 
     // rings
@@ -194,6 +197,9 @@
     setStatsVisible(v) { showStats = !!v; },
     setProgress(f) { progress = f == null ? null : Math.max(0, Math.min(1, f)); },
     pulse() { pulseT = 1; },
+    talk(ms) { talkUntil = t + Math.max(0, ms) / 1000; },
+    listen(ms) { listenUntil = t + Math.max(0, ms) / 1000; },
+    quiet() { talkUntil = 0; listenUntil = 0; },
     start, stop,
   };
 

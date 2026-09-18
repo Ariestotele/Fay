@@ -54,6 +54,9 @@ struct TileAction {
     closes: Vec<String>,
     #[serde(default)]
     minutes: Option<u32>,
+    /// Spoken after the action runs (any kind), if voice is enabled.
+    #[serde(default)]
+    say: Option<String>,
 }
 
 /// Handle to the app for code that runs outside commands (hotkey actions).
@@ -84,6 +87,24 @@ fn perform(a: &TileAction) -> Result<Option<String>, String> {
         "media" => do_media_key(a.action.as_deref().unwrap_or(""))?,
         "snippet" => do_paste_text(a.text.as_deref().unwrap_or(""), a.paste.unwrap_or(true))?,
         "wait" => std::thread::sleep(std::time::Duration::from_millis(a.wait.unwrap_or(500).min(60_000))),
+        // Clipboard history UI lives in the frontend: summon Fay and open it.
+        "clipboard" => {
+            let w = APP.get().and_then(|app| app.get_webview_window("main"));
+            match w {
+                Some(w) => {
+                    let inner = w.clone();
+                    let _ = w.run_on_main_thread(move || {
+                        if !inner.is_visible().unwrap_or(false) {
+                            fill_active_monitor(&inner);
+                            let _ = inner.show();
+                        }
+                        let _ = inner.set_focus();
+                        let _ = inner.eval("window.__fayClipboard && window.__fayClipboard()");
+                    });
+                }
+                None => return Err("no window".into()),
+            }
+        }
         // The focus timer lives in the frontend; a hotkey reaches it via eval.
         "focus" => {
             let minutes = a.minutes.unwrap_or(0);
@@ -116,12 +137,240 @@ fn perform(a: &TileAction) -> Result<Option<String>, String> {
                 }
             }
         }
+        "say" => voice_say(a.text.as_deref().unwrap_or(""))?,
+        "listen" => voice_listen()?,
         _ => match a.target.as_deref().filter(|t| !t.is_empty()) {
             Some(t) => do_launch(t, a.elevated)?,
             None => return Err("tile has no target".into()),
         },
     }
+    if let Some(s) = a.say.as_deref().filter(|s| !s.trim().is_empty()) {
+        let _ = voice_say(s);
+    }
     Ok(warning)
+}
+
+// ---- voice: Windows System.Speech (offline) --------------------------------
+// One persistent PowerShell process hosts both the synthesizer and the
+// recognizer so replies are instant and listening doesn't pay the ~1 s engine
+// start-up each time. Protocol (stdin, one command per line):
+//   say <url-encoded text> · grammar <url-encoded phrases, newline-separated>
+//   listen · stop
+// It answers on stdout: `heard\t<text>\t<confidence>` or `error\t<message>`,
+// which a reader thread forwards to the frontend (window.__fayHeard).
+
+struct VoiceProc {
+    child: std::process::Child,
+    stdin: std::process::ChildStdin,
+}
+static VOICE: std::sync::Mutex<Option<VoiceProc>> = std::sync::Mutex::new(None);
+static VOICE_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static VOICE_RATE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+static VOICE_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+const VOICE_SCRIPT: &str = r#"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Speech
+$tts = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$tts.Rate = __RATE__
+$vn = '__VOICE__'
+if ($vn -ne '') { try { $tts.SelectVoice($vn) } catch { } }
+$script:rec = $null
+$script:phrases = @('fay')
+function Ensure-Rec {
+  if (-not $script:rec) {
+    try {
+      $script:rec = New-Object System.Speech.Recognition.SpeechRecognitionEngine
+      $script:rec.SetInputToDefaultAudioDevice()
+    } catch { $script:rec = $null }
+  }
+}
+function Load-Grammar {
+  Ensure-Rec
+  if (-not $script:rec) { return }
+  $script:rec.UnloadAllGrammars()
+  $c = New-Object System.Speech.Recognition.Choices
+  $c.Add([string[]]$script:phrases)
+  $gb = New-Object System.Speech.Recognition.GrammarBuilder
+  $gb.Append($c)
+  $script:rec.LoadGrammar((New-Object System.Speech.Recognition.Grammar($gb)))
+}
+Write-Output "ready`t"
+while ($true) {
+  $line = [Console]::In.ReadLine()
+  if ($null -eq $line) { break }
+  if ($line.StartsWith('say ')) {
+    $t = [System.Uri]::UnescapeDataString($line.Substring(4))
+    $tts.SpeakAsyncCancelAll()
+    [void]$tts.SpeakAsync($t)
+    continue
+  }
+  if ($line.StartsWith('grammar ')) {
+    $j = [System.Uri]::UnescapeDataString($line.Substring(8))
+    $p = @($j -split "`n" | Where-Object { $_.Trim() -ne '' })
+    if ($p.Count -gt 0) { $script:phrases = $p; Load-Grammar }
+    continue
+  }
+  if ($line -eq 'listen') {
+    Ensure-Rec
+    if (-not $script:rec) { Write-Output "error`tno microphone / speech engine"; continue }
+    if ($script:rec.Grammars.Count -eq 0) { Load-Grammar }
+    $tts.SpeakAsyncCancelAll()
+    $res = $null
+    try { $res = $script:rec.Recognize([TimeSpan]::FromSeconds(6)) } catch { Write-Output ("error`t" + $_.Exception.Message); continue }
+    if ($res) { Write-Output ("heard`t{0}`t{1}" -f $res.Text, $res.Confidence) } else { Write-Output "heard`t`t0" }
+    continue
+  }
+  if ($line -eq 'stop') { $tts.SpeakAsyncCancelAll(); continue }
+}
+"#;
+
+/// Push a line to the frontend as a `window.__fayHeard(text, confidence, error)` call.
+fn voice_forward(line: &str) {
+    let mut parts = line.splitn(3, '\t');
+    let kind = parts.next().unwrap_or("");
+    let a = parts.next().unwrap_or("").to_string();
+    let b = parts.next().unwrap_or("").to_string();
+    let js = match kind {
+        "heard" => format!(
+            "window.__fayHeard && window.__fayHeard({}, {}, null)",
+            serde_json::to_string(&a).unwrap_or_default(),
+            b.trim().parse::<f32>().unwrap_or(0.0)
+        ),
+        "error" => format!(
+            "window.__fayHeard && window.__fayHeard('', 0, {})",
+            serde_json::to_string(&a).unwrap_or_default()
+        ),
+        _ => return,
+    };
+    if let Some(w) = APP.get().and_then(|app| app.get_webview_window("main")) {
+        let _ = w.eval(&js);
+    }
+}
+
+fn spawn_voice() -> Result<VoiceProc, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::io::BufRead;
+        let name = VOICE_NAME.lock().map(|n| n.clone()).unwrap_or_default().replace('\'', "''");
+        let script = VOICE_SCRIPT
+            .replace("__RATE__", &VOICE_RATE.load(std::sync::atomic::Ordering::Relaxed).clamp(-10, 10).to_string())
+            .replace("__VOICE__", &name);
+        let mut child = cmd("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| format!("voice: {e}"))?;
+        let stdin = child.stdin.take().ok_or("voice: no stdin")?;
+        let stdout = child.stdout.take().ok_or("voice: no stdout")?;
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+                voice_forward(&line);
+            }
+        });
+        Ok(VoiceProc { child, stdin })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("voice is only available on Windows".into())
+    }
+}
+
+/// Send one protocol line, starting (or restarting) the voice process as needed.
+fn voice_send(line: &str) -> Result<(), String> {
+    use std::io::Write;
+    if !VOICE_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err("voice is off (app.voice)".into());
+    }
+    let mut guard = VOICE.lock().map_err(|e| e.to_string())?;
+    // Drop a process that has exited.
+    if let Some(v) = guard.as_mut() {
+        if matches!(v.child.try_wait(), Ok(Some(_))) {
+            *guard = None;
+        }
+    }
+    if guard.is_none() {
+        *guard = Some(spawn_voice()?);
+    }
+    let v = guard.as_mut().unwrap();
+    if writeln!(v.stdin, "{line}").and_then(|_| v.stdin.flush()).is_err() {
+        // Restart once and retry.
+        *guard = Some(spawn_voice()?);
+        let v = guard.as_mut().unwrap();
+        writeln!(v.stdin, "{line}").and_then(|_| v.stdin.flush()).map_err(|e| format!("voice: {e}"))?;
+    }
+    Ok(())
+}
+
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+fn voice_say(text: &str) -> Result<(), String> {
+    let t = text.trim();
+    if t.is_empty() {
+        return Ok(());
+    }
+    voice_send(&format!("say {}", url_encode(t)))
+}
+
+fn voice_listen() -> Result<(), String> {
+    voice_send("listen")?;
+    if let Some(w) = APP.get().and_then(|app| app.get_webview_window("main")) {
+        let _ = w.eval("window.__fayListening && window.__fayListening()");
+    }
+    Ok(())
+}
+
+/// Configure voice from `app.voice` / `voiceRate` / `voiceName`; starts the
+/// engine right away when enabled so the first reply is instant.
+#[tauri::command]
+async fn voice_config(enabled: bool, rate: Option<i32>, name: Option<String>) -> Result<(), String> {
+    VOICE_RATE.store(rate.unwrap_or(0), std::sync::atomic::Ordering::Relaxed);
+    if let Ok(mut n) = VOICE_NAME.lock() {
+        *n = name.unwrap_or_default();
+    }
+    VOICE_ENABLED.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    // Restart so rate / voice changes apply.
+    if let Ok(mut g) = VOICE.lock() {
+        if let Some(mut v) = g.take() {
+            let _ = v.child.kill();
+        }
+    }
+    if enabled {
+        voice_send("stop")?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn say(text: String) -> Result<(), String> {
+    voice_say(&text)
+}
+
+#[tauri::command]
+async fn listen() -> Result<(), String> {
+    voice_listen()
+}
+
+#[tauri::command]
+async fn set_voice_grammar(phrases: Vec<String>) -> Result<(), String> {
+    let joined = phrases
+        .iter()
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    voice_send(&format!("grammar {}", url_encode(&joined)))
 }
 
 /// Ask processes to close (graceful `taskkill /IM`, which sends WM_CLOSE). A
@@ -320,6 +569,331 @@ async fn get_stats(state: tauri::State<'_, StatsMutex>) -> Result<Stats, String>
     };
     let (gpu, gpu_temp) = gpu_stats();
     Ok(Stats { cpu, ram_used, ram_total, gpu, gpu_temp, down, up })
+}
+
+// ---- clipboard history -----------------------------------------------------
+// In memory only (never written to disk). A poller thread watches the
+// clipboard sequence number and records new text; entries marked by password
+// managers as "exclude from monitoring" are skipped.
+
+static CLIP_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static CLIP_MAX: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(50);
+static CLIP_HISTORY: std::sync::Mutex<std::collections::VecDeque<String>> =
+    std::sync::Mutex::new(std::collections::VecDeque::new());
+static CLIP_THREAD: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+
+/// Current clipboard text, or None if it isn't text / is excluded / is busy.
+#[cfg(target_os = "windows")]
+fn read_clipboard_text() -> Option<String> {
+    use windows_sys::Win32::System::DataExchange::{
+        CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
+        RegisterClipboardFormatW,
+    };
+    use windows_sys::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+    const CF_UNICODETEXT: u32 = 13;
+    unsafe {
+        let excl: Vec<u16> = "ExcludeClipboardContentFromMonitorProcessing\0".encode_utf16().collect();
+        let excl_fmt = RegisterClipboardFormatW(excl.as_ptr());
+        if IsClipboardFormatAvailable(CF_UNICODETEXT) == 0 {
+            return None;
+        }
+        if excl_fmt != 0 && IsClipboardFormatAvailable(excl_fmt) != 0 {
+            return None;
+        }
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return None;
+        }
+        let h = GetClipboardData(CF_UNICODETEXT);
+        let mut out = None;
+        if !h.is_null() {
+            let p = GlobalLock(h) as *const u16;
+            if !p.is_null() {
+                let mut len = 0usize;
+                while len < 200_000 && *p.add(len) != 0 {
+                    len += 1;
+                }
+                let slice = std::slice::from_raw_parts(p, len);
+                out = Some(String::from_utf16_lossy(slice));
+                GlobalUnlock(h);
+            }
+        }
+        CloseClipboard();
+        out
+    }
+}
+
+fn clip_push(text: String) {
+    if text.trim().is_empty() {
+        return;
+    }
+    if let Ok(mut h) = CLIP_HISTORY.lock() {
+        h.retain(|t| t != &text);
+        h.push_front(text);
+        let max = CLIP_MAX.load(std::sync::atomic::Ordering::Relaxed).max(1);
+        while h.len() > max {
+            h.pop_back();
+        }
+    }
+}
+
+fn start_clipboard_watch() {
+    CLIP_THREAD.get_or_init(|| {
+        std::thread::spawn(|| {
+            #[cfg(target_os = "windows")]
+            {
+                use windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber;
+                let mut last = unsafe { GetClipboardSequenceNumber() };
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(400));
+                    if !CLIP_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+                        continue;
+                    }
+                    let seq = unsafe { GetClipboardSequenceNumber() };
+                    if seq == last {
+                        continue;
+                    }
+                    // Only advance once we managed to read (the owner may still hold it).
+                    if let Some(t) = read_clipboard_text() {
+                        last = seq;
+                        clip_push(t);
+                    } else {
+                        last = seq;
+                    }
+                }
+            }
+        });
+    });
+}
+
+/// Turn the clipboard watcher on/off (config `app.clipboard`), with a max size.
+#[tauri::command]
+fn set_clipboard_watch(enabled: bool, max: Option<usize>) {
+    if let Some(m) = max {
+        CLIP_MAX.store(m.clamp(1, 500), std::sync::atomic::Ordering::Relaxed);
+    }
+    CLIP_ENABLED.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    if enabled {
+        start_clipboard_watch();
+    }
+}
+
+#[tauri::command]
+fn clipboard_history() -> Vec<String> {
+    CLIP_HISTORY.lock().map(|h| h.iter().cloned().collect()).unwrap_or_default()
+}
+
+#[tauri::command]
+fn clipboard_clear() {
+    if let Ok(mut h) = CLIP_HISTORY.lock() {
+        h.clear();
+    }
+}
+
+/// Put a history entry back on the clipboard and (optionally) paste it.
+#[tauri::command]
+async fn clipboard_pick(text: String, paste: bool) -> Result<(), String> {
+    do_paste_text(&text, paste)
+}
+
+// ---- file search (voidtools Everything) ------------------------------------
+
+#[derive(serde::Serialize)]
+struct FileHit {
+    name: String,
+    path: String,
+    dir: bool,
+}
+
+/// Query Everything through its `es.exe` CLI. `es` may be a full path from the
+/// config; otherwise `es.exe` must be on PATH.
+#[tauri::command]
+async fn search_files(query: String, max: Option<u32>, es: Option<String>) -> Result<Vec<FileHit>, String> {
+    let q = query.trim();
+    if q.is_empty() {
+        return Ok(Vec::new());
+    }
+    let exe = es
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(expand_env)
+        .unwrap_or_else(|| "es.exe".to_string());
+    let n = max.unwrap_or(30).clamp(1, 200).to_string();
+    let out = cmd(&exe)
+        .args(["-n", &n, "-sort", "date-modified-descending", q])
+        .output()
+        .map_err(|_| "Everything's es.exe not found — install Everything + es.exe (see SETUP)".to_string())?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        return Err(if err.is_empty() { "Everything is not running".into() } else { err });
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    Ok(text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(|l| {
+            let p = std::path::Path::new(l);
+            FileHit {
+                name: p.file_name().and_then(|n| n.to_str()).unwrap_or(l).to_string(),
+                path: l.to_string(),
+                dir: p.is_dir(),
+            }
+        })
+        .collect())
+}
+
+/// Open Explorer with the file selected.
+#[tauri::command]
+async fn reveal(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        cmd("explorer.exe")
+            .arg(format!("/select,{path}"))
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = path;
+        Err("reveal is only implemented on Windows".into())
+    }
+}
+
+// ---- browser bookmarks -----------------------------------------------------
+
+#[derive(Clone, serde::Serialize)]
+struct Bookmark {
+    title: String,
+    url: String,
+    browser: String,
+}
+
+static BOOKMARK_CACHE: std::sync::Mutex<Option<(std::time::Instant, Vec<Bookmark>)>> =
+    std::sync::Mutex::new(None);
+
+fn collect_moz(node: &serde_json::Value, out: &mut Vec<Bookmark>, browser: &str) {
+    if let Some(children) = node.get("children").and_then(|c| c.as_array()) {
+        for c in children {
+            collect_moz(c, out, browser);
+        }
+    } else if let Some(uri) = node.get("uri").and_then(|u| u.as_str()) {
+        if uri.starts_with("http") {
+            out.push(Bookmark {
+                title: node.get("title").and_then(|t| t.as_str()).unwrap_or("").to_string(),
+                url: uri.to_string(),
+                browser: browser.to_string(),
+            });
+        }
+    }
+}
+
+fn collect_chromium(node: &serde_json::Value, out: &mut Vec<Bookmark>, browser: &str) {
+    if let Some(children) = node.get("children").and_then(|c| c.as_array()) {
+        for c in children {
+            collect_chromium(c, out, browser);
+        }
+    } else if node.get("type").and_then(|t| t.as_str()) == Some("url") {
+        if let Some(url) = node.get("url").and_then(|u| u.as_str()) {
+            out.push(Bookmark {
+                title: node.get("name").and_then(|t| t.as_str()).unwrap_or("").to_string(),
+                url: url.to_string(),
+                browser: browser.to_string(),
+            });
+        }
+    }
+}
+
+/// Newest `bookmarkbackups/*.jsonlz4` under a Firefox-family profiles root.
+fn newest_moz_backup(profiles_root: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut best: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
+    for prof in std::fs::read_dir(profiles_root).ok()?.flatten() {
+        let dir = prof.path().join("bookmarkbackups");
+        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        for f in rd.flatten() {
+            let p = f.path();
+            if p.extension().and_then(|e| e.to_str()) != Some("jsonlz4") {
+                continue;
+            }
+            let Ok(m) = f.metadata().and_then(|m| m.modified()) else { continue };
+            if best.as_ref().map(|(t, _)| m > *t).unwrap_or(true) {
+                best = Some((m, p));
+            }
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
+fn read_mozlz4(path: &std::path::Path) -> Option<serde_json::Value> {
+    let data = std::fs::read(path).ok()?;
+    if data.len() < 12 || &data[..8] != b"mozLz40\0" {
+        return None;
+    }
+    let size = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
+    let raw = lz4_flex::block::decompress(&data[12..], size).ok()?;
+    serde_json::from_slice(&raw).ok()
+}
+
+fn load_bookmarks() -> Vec<Bookmark> {
+    let mut out = Vec::new();
+    let appdata = std::env::var("APPDATA").unwrap_or_default();
+    let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    if appdata.is_empty() {
+        return out;
+    }
+    // Firefox family: daily jsonlz4 backups (may lag the live DB by a day).
+    for (name, sub) in [
+        ("Zen", "zen\\Profiles"),
+        ("Firefox", "Mozilla\\Firefox\\Profiles"),
+        ("LibreWolf", "librewolf\\Profiles"),
+        ("Floorp", "Floorp\\Profiles"),
+    ] {
+        let root = std::path::Path::new(&appdata).join(sub);
+        if let Some(p) = newest_moz_backup(&root) {
+            if let Some(json) = read_mozlz4(&p) {
+                collect_moz(&json, &mut out, name);
+            }
+        }
+    }
+    // Chromium family: plain JSON.
+    if !local.is_empty() {
+        for (name, sub) in [
+            ("Chrome", "Google\\Chrome\\User Data\\Default\\Bookmarks"),
+            ("Edge", "Microsoft\\Edge\\User Data\\Default\\Bookmarks"),
+            ("Brave", "BraveSoftware\\Brave-Browser\\User Data\\Default\\Bookmarks"),
+            ("Vivaldi", "Vivaldi\\User Data\\Default\\Bookmarks"),
+        ] {
+            let p = std::path::Path::new(&local).join(sub);
+            let Ok(text) = std::fs::read_to_string(&p) else { continue };
+            let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { continue };
+            if let Some(roots) = json.get("roots").and_then(|r| r.as_object()) {
+                for (_, root) in roots {
+                    collect_chromium(root, &mut out, name);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// All bookmarks from every browser found, cached for five minutes.
+#[tauri::command]
+async fn list_bookmarks(refresh: Option<bool>) -> Result<Vec<Bookmark>, String> {
+    if refresh != Some(true) {
+        if let Ok(c) = BOOKMARK_CACHE.lock() {
+            if let Some((t, list)) = c.as_ref() {
+                if t.elapsed() < std::time::Duration::from_secs(300) {
+                    return Ok(list.clone());
+                }
+            }
+        }
+    }
+    let list = load_bookmarks();
+    if let Ok(mut c) = BOOKMARK_CACHE.lock() {
+        *c = Some((std::time::Instant::now(), list.clone()));
+    }
+    Ok(list)
 }
 
 /// A Windows toast (used when the focus timer ends while Fay is hidden).
@@ -1248,7 +1822,18 @@ fn main() {
             set_summon_monitor,
             list_commands,
             get_stats,
-            notify
+            notify,
+            set_clipboard_watch,
+            clipboard_history,
+            clipboard_clear,
+            clipboard_pick,
+            search_files,
+            reveal,
+            list_bookmarks,
+            voice_config,
+            say,
+            listen,
+            set_voice_grammar
         ])
         .setup(|app| {
             let _ = APP.set(app.handle().clone());

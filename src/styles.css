@@ -140,6 +140,24 @@ body.in-folder .group--folder { display: flex; }
 .filter__ans { margin-left: 14px; color: var(--txt); text-shadow: 0 0 12px var(--accent); }
 .filter__hint { margin-left: 14px; font-size: 9.5px; color: var(--dim); letter-spacing: 0.1em; }
 
+/* results mode (files / bookmarks / clipboard): rows replace the tile grid */
+.results { display: none; flex-direction: column; gap: 4px; width: 720px; max-width: 92vw; }
+body.results .results { display: flex; }
+body.results .groups, body.results .group--folder { display: none; }
+.row {
+  display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 10px; text-align: left;
+  background: rgba(3, 16, 13, 0.45); border: 1px solid transparent;
+  color: inherit; font: inherit; cursor: pointer;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.row:hover, .row.is-sel { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: rgba(3, 16, 13, 0.62); }
+.row.is-sel { box-shadow: 0 0 20px -8px var(--accent); }
+.row__icon { color: var(--accent); text-align: center; }
+.row__text { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row__sub { font-size: 9.5px; color: var(--dim); max-width: 46%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row--empty { display: block; color: var(--dim); font-size: 11px; cursor: default; }
+
 /* scene teardown: × appears on hover for tiles with `closes` */
 .tile__close {
   position: absolute; top: 4px; right: 8px;
