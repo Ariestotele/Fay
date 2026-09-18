@@ -5,6 +5,7 @@
     "columns": 4,
     "hotkey": "Ctrl+Alt+Space",
     "mouseSummon": "Ctrl+Mouse5",
+    "summonOn": "cursor",
     "autostart": false,
     "accent": "auto",
     "backdrop": 0.62,
@@ -44,7 +45,11 @@
     { "id": "lifeos",  "name": "LifeOS",       "glyph": "❖", "target": "lifeos", "hint": "Set to the LifeOS exe path or its web URL" },
     { "id": "phone",   "name": "Phone Link",   "glyph": "☏", "target": "ms-phone:" },
     { "id": "steam",   "name": "Steam",        "glyph": "▸", "target": "steam://open/main" },
-    { "id": "taskmgr", "name": "Task Manager", "glyph": "▦", "target": "taskmgr", "hint": "Add \"elevated\": true if you want it to start as admin" }
+    { "id": "taskmgr", "name": "Task Manager", "glyph": "▦", "target": "taskmgr", "hint": "Add \"elevated\": true if you want it to start as admin" },
+    { "id": "yt",      "name": "YouTube",      "glyph": "▶", "keyword": "yt", "target": "https://www.youtube.com/results?search_query={query}", "hint": "type: yt lofi ⏎" },
+    { "id": "sig",     "name": "Sign-off",     "glyph": "✎", "kind": "snippet", "text": "Best regards,\n— sent via Fay", "hint": "pastes into the app in front" }
   ],
+  "system": [],
+  "packs": ["power", "media"],
   "machines": {}
 }

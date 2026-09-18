@@ -3,11 +3,14 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** **Phases 1–16 merged to `main`, all CI-green. Build-day queue
-complete.** v0.1.0 is published on the Releases page
-(`Fay_0.1.0_x64-setup.exe`); every later push to `main` also uploads a fresh
-installer artifact. Owner has not yet runtime-tested — that is the next thing
-that matters. Next features are the owner's pick (see Pipeline).
+**Current phase:** **"Do them all" run — owner asked for every pipeline
+candidate, built as six batches (one PR each, auto-merged on green).** Batch 1
+(Phase 17) is in PR. Order: 1 quick wins → 2 deck structure (folders,
+multi-action, teardown, command folder) → 3 Heart extras (stats, timer) →
+4 search (clipboard, Everything, bookmarks) → 5 voice (TTS + push-to-talk) →
+6 AI (NL bar, screen-aware, agentic) → path picker → debug round. v0.1.0 is
+on Releases; every push to `main` uploads a fresh installer artifact. Owner has
+not yet runtime-tested.
 
 ## ✅ Done (all merged)
 
@@ -31,6 +34,7 @@ that matters. Next features are the owner's pick (see Pipeline).
 | — | **Debug round** — no console flashes (`CREATE_NO_WINDOW`), blocking commands made `async` (no UI freeze), Heart idle while hidden, HiDPI-crisp canvas, no runaway polling, broken-config fallback (in PR) |
 | 15 | README rewritten as the product front door — preview, 30-second install, feature table, full config reference |
 | 16 | Ctrl+Mouse5 summon — `app.mouseSummon`, WH_MOUSE_LL hook thread (`windows-sys`), swallows the click; `set_mouse_summon` |
+| 17 | **Batch 1 / quick wins** — tile `kind`s (system / media / snippet) via one `TileAction` + `fire`; packs (`power media tools settings links`) into a `system` group; quicklinks (`{query}` + `keyword`); calculator + unit conversion on the filter line (`= …`, Enter copies); config validation with line/col; `summonOn: "cursor"`; press-twice confirm for destructive actions (in PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -53,12 +57,15 @@ that matters. Next features are the owner's pick (see Pipeline).
 - [ ] Runtime checks: tray appears, Ctrl+Alt+Space toggles, a UAC tile prompts,
       footer shows real monitor count, accent matches Windows.
 
-## 🚀 Pipeline — candidate features (owner picks; nothing here is started)
+## 🚀 Pipeline — the "do them all" queue
 
 Researched 2026-09-18 from Raycast / Flow Launcher / PowerToys Command Palette /
 Keypirinha / Listary / ueli / Wox, Stream Deck-style macro software, and the
 "AI Jarvis" launcher wave (Raycast AI, Open.Jarvis, Cluely/Highlight). Effort:
 S = frontend/config only, M = a Rust command or two, L = new subsystem.
+**Owner said "do them all"** — batches: 1 = #1 2 3 8 10 12 16 17 18 (✅ Phase 17);
+2 = #4 5 6 11; 3 = #13 14; 4 = #7 9 15; 5 = C B; 6 = A D E; then #19. #20 needs
+a purchased certificate (owner).
 
 ### AI — "talk to Fay" (the viral category)
 

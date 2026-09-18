@@ -211,6 +211,73 @@ name shown in Task Manager's *Details* tab (without `.exe`).
 - **Type** — just start typing to filter tiles by name; **Enter** fires the first match.
 - **Backspace** edits the filter; **Esc** clears it (press again to close the deck).
 - **Arrows** move focus between tiles; **Enter** fires the focused one.
+- **`= …`** — start with `=` for a calculation or a conversion (below). Digits
+  fire tiles only while nothing is typed, so `=` is how a line that starts with
+  a number gets in.
+
+## Calculator & unit conversion
+
+Type an expression into the open deck and the answer appears on the filter
+line; **Enter copies it** to the clipboard.
+
+| You type | You get |
+| :-- | :-- |
+| `= 1440*0.62` | `892.8` |
+| `sqrt(2)*3`, `2^10`, `round(pi*100)/100` | `4.2426…`, `1024`, `3.14` |
+| `= 5 mi to km`, `= 72 f in c`, `= 1 gb to mib` | `8.04672 km`, `22.2222 c`, `953.674 mib` |
+
+Operators `+ - * / ^ %`, parentheses, `pi`, `e`, and `sqrt abs sin cos tan log
+ln round floor ceil min max`. Units: length, mass, volume, time, data, speed,
+area, temperature (`c f k`). Currency needs the network and is not built in.
+
+## Quicklinks — `yt lofi`
+
+A tile whose `target` contains `{query}` is a quicklink. Give it a `keyword`
+(defaults to its `id`), then type the keyword, a space, and your search:
+
+```json
+{ "id": "yt", "name": "YouTube", "keyword": "yt",
+  "target": "https://www.youtube.com/results?search_query={query}" }
+```
+
+`yt lofi` + **Enter** opens YouTube's search for "lofi" (the query is URL
+encoded). Clicking a quicklink tile just pre-fills its keyword. The `links`
+pack ships YouTube / Google / GitHub quicklinks.
+
+## System, media and snippet tiles (`kind`)
+
+Besides launching things, a tile can be one of three built-in kinds:
+
+```json
+{ "id": "lock", "name": "Lock",         "kind": "system",  "action": "lock" },
+{ "id": "next", "name": "Next track",   "kind": "media",   "action": "next", "hotkey": "Ctrl+Alt+N" },
+{ "id": "sig",  "name": "Sign-off",     "kind": "snippet", "text": "Best regards,\nMe" }
+```
+
+| `kind` | `action` / field | Notes |
+| :-- | :-- | :-- |
+| `system` | `lock` `sleep` `hibernate` `restart` `shutdown` `logoff` `recycle` (empty Recycle Bin) `darkmode` (toggle Windows dark/light) | `restart` / `shutdown` / `logoff` / `hibernate` need a **second press within 3 s** (set `"confirm": false` to skip, or `true` on any tile to require it). |
+| `media` | `playpause` `next` `prev` `stop` `mute` `volup` `voldown` | Sent as real multimedia keys, so Spotify / browser / game respond. Firing one keeps the deck open. |
+| `snippet` | `text` | Copies `text` and pastes it (Ctrl+V) into the app that was in front; Fay hides first. `"paste": false` copies only. |
+
+All kinds work with a direct `hotkey` too. Tiles go in `scenes`, `apps` or the
+third group, `system`.
+
+### Packs — ready-made tile sets
+
+`"packs": ["power", "media"]` in the config appends preset tiles (defined in
+`src/packs.json`). Available: **power** (Lock, Sleep, Restart, Shut down),
+**media** (Play/Pause, Next, Previous, Mute, Volume ±), **tools** (Empty
+Recycle Bin, Toggle dark mode, Hibernate, Sign out), **settings** (Bluetooth,
+Sound, Display, Network, Windows Update, Installed apps via `ms-settings:`),
+**links** (YouTube / Google / GitHub quicklinks). A pack tile is skipped when
+your config already has a tile with the same id, so you can override any of
+them (e.g. give `sys-lock` a hotkey).
+
+## Which monitor Fay opens on
+
+`"summonOn": "cursor"` (default) shows Fay on the monitor under the mouse;
+`"current"` keeps it on the monitor it was last on.
 
 ## Direct hotkeys — fire a scene or app without opening Fay
 

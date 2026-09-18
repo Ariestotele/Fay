@@ -1,0 +1,51 @@
+{
+  "_comment": "Preset tile packs. Enable with \"packs\": [\"power\", \"media\"] in apps.config.json. A pack tile is skipped if your config already has a tile with the same id, so you can override any of them.",
+  "power": {
+    "group": "system",
+    "tiles": [
+      { "id": "sys-lock",     "name": "Lock",      "glyph": "⌧", "kind": "system", "action": "lock" },
+      { "id": "sys-sleep",    "name": "Sleep",     "glyph": "☾", "kind": "system", "action": "sleep" },
+      { "id": "sys-restart",  "name": "Restart",   "glyph": "↻", "kind": "system", "action": "restart",  "hint": "press twice" },
+      { "id": "sys-shutdown", "name": "Shut down", "glyph": "⏻", "kind": "system", "action": "shutdown", "hint": "press twice" }
+    ]
+  },
+  "media": {
+    "group": "system",
+    "tiles": [
+      { "id": "med-play", "name": "Play / Pause", "glyph": "▶", "kind": "media", "action": "playpause" },
+      { "id": "med-next", "name": "Next",         "glyph": "⏭", "kind": "media", "action": "next" },
+      { "id": "med-prev", "name": "Previous",     "glyph": "⏮", "kind": "media", "action": "prev" },
+      { "id": "med-mute", "name": "Mute",         "glyph": "🔇", "kind": "media", "action": "mute" },
+      { "id": "med-up",   "name": "Volume +",     "glyph": "🔊", "kind": "media", "action": "volup" },
+      { "id": "med-down", "name": "Volume −",     "glyph": "🔉", "kind": "media", "action": "voldown" }
+    ]
+  },
+  "tools": {
+    "group": "system",
+    "tiles": [
+      { "id": "sys-recycle",  "name": "Empty Recycle Bin", "glyph": "🗑", "kind": "system", "action": "recycle" },
+      { "id": "sys-darkmode", "name": "Toggle dark mode",  "glyph": "◐", "kind": "system", "action": "darkmode" },
+      { "id": "sys-hibernate","name": "Hibernate",         "glyph": "❄", "kind": "system", "action": "hibernate", "hint": "press twice" },
+      { "id": "sys-logoff",   "name": "Sign out",          "glyph": "⇥", "kind": "system", "action": "logoff",    "hint": "press twice" }
+    ]
+  },
+  "settings": {
+    "group": "system",
+    "tiles": [
+      { "id": "set-bluetooth", "name": "Bluetooth",      "glyph": "ᛒ", "target": "ms-settings:bluetooth" },
+      { "id": "set-sound",     "name": "Sound",          "glyph": "♫", "target": "ms-settings:sound" },
+      { "id": "set-display",   "name": "Display",        "glyph": "▭", "target": "ms-settings:display" },
+      { "id": "set-network",   "name": "Network",        "glyph": "⇅", "target": "ms-settings:network" },
+      { "id": "set-update",    "name": "Windows Update", "glyph": "⟳", "target": "ms-settings:windowsupdate" },
+      { "id": "set-apps",      "name": "Installed apps", "glyph": "▤", "target": "ms-settings:appsfeatures" }
+    ]
+  },
+  "links": {
+    "group": "apps",
+    "tiles": [
+      { "id": "ql-yt", "name": "YouTube", "glyph": "▶", "keyword": "yt", "target": "https://www.youtube.com/results?search_query={query}", "hint": "type: yt lofi" },
+      { "id": "ql-g",  "name": "Google",  "glyph": "◎", "keyword": "g",  "target": "https://www.google.com/search?q={query}",              "hint": "type: g anything" },
+      { "id": "ql-gh", "name": "GitHub",  "glyph": "⌥", "keyword": "gh", "target": "https://github.com/search?q={query}",                 "hint": "type: gh tauri" }
+    ]
+  }
+}

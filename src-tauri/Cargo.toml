@@ -14,10 +14,13 @@ tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Mouse-button summon (Ctrl+Mouse5) needs a low-level mouse hook — Windows only.
+# Windows-only native bits: the low-level mouse hook (Ctrl+Mouse5 summon),
+# SendInput (media keys, snippet paste) and the clipboard.
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
 ] }
