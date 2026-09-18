@@ -435,6 +435,34 @@ fn b64_decode(s: &str) -> Result<Vec<u8>, ()> {
     Ok(out)
 }
 
+/// Names of running processes (lowercase, no extension) so the UI can mark
+/// tiles whose app is already open.
+#[tauri::command]
+fn list_running() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let out = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-Process | Select-Object -ExpandProperty ProcessName -Unique",
+            ])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let s = String::from_utf8_lossy(&out.stdout);
+        Ok(s
+            .lines()
+            .map(|l| l.trim().to_lowercase())
+            .filter(|l| !l.is_empty())
+            .collect())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(Vec::new())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(HotkeyState::default())
@@ -486,7 +514,8 @@ fn main() {
             save_config,
             config_file_path,
             show_window,
-            get_app_icon
+            get_app_icon,
+            list_running
         ])
         .setup(|app| {
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).

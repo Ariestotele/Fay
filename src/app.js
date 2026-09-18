@@ -18,7 +18,7 @@ const invoke =
   tauri && tauri.core && tauri.core.invoke ? tauri.core.invoke.bind(tauri.core) : null;
 
 // ---- open / rest state ----------------------------------------------------
-function openDeck() { document.body.classList.add("open"); }
+function openDeck() { document.body.classList.add("open"); refreshRunning(); }
 function closeDeck() { document.body.classList.remove("open"); setFilter(""); }
 function isOpen() { return document.body.classList.contains("open"); }
 
@@ -83,6 +83,7 @@ function tile(item, kind) {
   const el = document.createElement("button");
   el.className = `tile tile--${kind}`;
   el.dataset.name = item.name || "";
+  el.dataset.proc = processNameFor(item);
   const badge = item.elevated ? `<span class="tile__badge">ADMIN</span>` : "";
   const key = item.hotkey ? `<span class="tile__key">${escapeHtml(item.hotkey)}</span>` : "";
   el.innerHTML = `
@@ -106,6 +107,28 @@ function loadIcon(el, item) {
   if (item.icon) { show(item.icon); return; }
   if (!invoke || !item.target) return;
   invoke("get_app_icon", { target: item.target }).then(show).catch(() => {});
+}
+
+// ---- running-app indicator -------------------------------------------------
+// Guess the process name from the target (explicit `process` wins):
+//   ...\zen.exe -> zen, Discord.lnk -> discord, taskmgr -> taskmgr, steam:// -> steam
+function processNameFor(item) {
+  if (item.process) return String(item.process).toLowerCase();
+  const t = String(item.target || "");
+  const proto = t.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (proto && !/^[a-z]:\\/i.test(t)) return proto[1].toLowerCase();
+  const base = t.split(/[\\/]/).pop() || "";
+  return base.replace(/\.(exe|lnk|bat|cmd)$/i, "").toLowerCase();
+}
+
+async function refreshRunning() {
+  if (!invoke) return;
+  try {
+    const running = new Set(await invoke("list_running"));
+    for (const t of document.querySelectorAll(".tile")) {
+      t.classList.toggle("is-running", !!t.dataset.proc && running.has(t.dataset.proc));
+    }
+  } catch (e) { /* non-fatal */ }
 }
 
 function escapeHtml(s) {
@@ -245,6 +268,8 @@ async function main() {
     (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
     (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
     renumber();
+    refreshRunning();
+    setInterval(() => { if (isOpen()) refreshRunning(); }, 5000);
 
     // Direct hotkeys: any tile with a `hotkey` fires without opening Fay.
     const bindings = [...(cfg.scenes || []), ...(cfg.apps || [])]

@@ -23,8 +23,9 @@ progress (see Pipeline).
 | 8 | Direct scene/app hotkeys — per-tile `hotkey` fires the tile (with `audioOut`) without opening Fay; unified `HotkeyState` |
 | 9 | Installed-build readiness — user-editable config seeded to `%APPDATA%\com.fay.hub\apps.config.json` (tray: Open config / Reload), starts hidden (`startHidden`), amber `warn()` surfacing in the footer (in PR) |
 | 10 | Number-key launch (1–9) + type-to-filter with Enter-to-fire, Esc clears; frontend only (in PR) |
-| 11 | Release workflow — `v*` tag builds the installer and publishes it on the GitHub Releases page (in PR; first tag `v0.1.0`) |
-| 12 | Real app icons — `get_app_icon` extracts + caches each target's icon; glyph fallback; `icon` override (next PR) |
+| 11 | Release workflow — on push to `main`, publishes `v<version>` (from package.json) on the GitHub Releases page if not yet released; creates the tag itself (tag pushes aren't possible from the agent) |
+| 12 | Real app icons — `get_app_icon` extracts + caches each target's icon; glyph fallback; `icon` override (in PR) |
+| 13 | Running-app indicator — `list_running` + per-tile process-name guess (`process` override); glowing dot; polled only while open (next PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -50,7 +51,7 @@ progress (see Pipeline).
 
 | Feature | Value | Notes |
 | :-- | :-- | :-- |
-| Running-app indicator | med | dot on apps already open — **next** |
+| Per-machine profiles | med | different paths per PC — **next** |
 | Per-machine profiles | med | different paths per PC; fixes absolute-path portability |
 | Running-app indicator | med | dot on apps already open |
 | First-run path picker | med | "browse…" to capture exe paths |
