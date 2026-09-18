@@ -2170,3 +2170,108 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running Fay");
 }
+
+// ---- unit tests for the pure helpers (run with `cargo test`) -----------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expand_env_replaces_known_vars_and_keeps_unknown() {
+        std::env::set_var("FAY_TEST_HOME", "C:\\Users\\me");
+        assert_eq!(expand_env("%FAY_TEST_HOME%\\Desktop\\x.lnk"), "C:\\Users\\me\\Desktop\\x.lnk");
+        assert_eq!(expand_env("%FAY_NOPE_UNSET%\\a"), "%FAY_NOPE_UNSET%\\a");
+        assert_eq!(expand_env("100% sure"), "100% sure");
+        assert_eq!(expand_env("no vars"), "no vars");
+    }
+
+    #[test]
+    fn url_encode_is_ascii_safe_and_reversible_by_powershell_rules() {
+        assert_eq!(url_encode("hey Fay"), "hey%20Fay");
+        assert_eq!(url_encode("a-b_c.d~e"), "a-b_c.d~e");
+        assert_eq!(url_encode("ü\n"), "%C3%BC%0A");
+    }
+
+    #[test]
+    fn base64_roundtrip() {
+        for s in [&b""[..], b"f", b"fo", b"foo", b"foob", b"fooba", b"foobar", &[0u8, 255, 16, 7]] {
+            assert_eq!(b64_decode(&b64(s)).unwrap(), s.to_vec());
+        }
+        assert_eq!(b64(b"foobar"), "Zm9vYmFy");
+        assert!(b64_decode("not base64!").is_err());
+    }
+
+    #[test]
+    fn powershell_encoded_command_is_utf16le_base64() {
+        // "A" as UTF-16LE is 0x41 0x00 → "QQA="
+        let utf16: Vec<u8> = "A".encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        assert_eq!(b64(&utf16), "QQA=");
+    }
+
+    #[test]
+    fn mozlz4_backup_is_parsed() {
+        let json = br#"{"children":[{"title":"Fay","uri":"https://github.com/Ariestotele/Fay"},{"title":"sep","type":"text/x-moz-place-separator"},{"children":[{"title":"Tauri","uri":"https://tauri.app"}]}]}"#;
+        let mut file = b"mozLz40\0".to_vec();
+        file.extend_from_slice(&(json.len() as u32).to_le_bytes());
+        file.extend_from_slice(&lz4_flex::block::compress(json));
+        let dir = std::env::temp_dir().join(format!("fay-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("bookmarks-2026-09-18_3_abc.jsonlz4");
+        std::fs::write(&p, &file).unwrap();
+        let v = read_mozlz4(&p).expect("parses");
+        let mut out = Vec::new();
+        collect_moz(&v, &mut out, "Zen");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].title, "Fay");
+        assert_eq!(out[1].url, "https://tauri.app");
+        assert_eq!(out[1].browser, "Zen");
+        assert!(read_mozlz4(std::path::Path::new("/definitely/missing.jsonlz4")).is_none());
+    }
+
+    #[test]
+    fn chromium_bookmarks_are_walked() {
+        let v: serde_json::Value = serde_json::from_str(r#"{"roots":{"bookmark_bar":{"children":[{"type":"url","name":"A","url":"https://a.test"},{"type":"folder","children":[{"type":"url","name":"B","url":"https://b.test"}]}]}}}"#).unwrap();
+        let mut out = Vec::new();
+        for (_, root) in v["roots"].as_object().unwrap() {
+            collect_chromium(root, &mut out, "Chrome");
+        }
+        assert_eq!(out.iter().map(|b| b.title.as_str()).collect::<Vec<_>>(), ["A", "B"]);
+    }
+
+    #[test]
+    fn tile_action_deserializes_camel_case_and_defaults() {
+        let a: TileAction = serde_json::from_str(r#"{"kind":"multi","steps":[{"kind":"media","action":"playpause"},{"kind":"wait","wait":400},{"target":"x.exe","audioOut":"Speakers"}]}"#).unwrap();
+        assert_eq!(a.kind, "multi");
+        assert_eq!(a.steps.len(), 3);
+        assert_eq!(a.steps[1].wait, Some(400));
+        assert_eq!(a.steps[2].audio_out.as_deref(), Some("Speakers"));
+        assert!(a.steps[2].paste.is_none());
+        let b: HotkeyBinding = serde_json::from_str(r#"{"accelerator":"Ctrl+Alt+F","kind":"focus","minutes":25}"#).unwrap();
+        assert_eq!(b.accelerator, "Ctrl+Alt+F");
+        assert_eq!(b.action.minutes, Some(25));
+    }
+
+    #[test]
+    fn perform_multi_stops_at_first_failing_step() {
+        // A launch step with no target fails; the error names the step number.
+        let a = TileAction { kind: "multi".into(), steps: vec![TileAction { kind: "wait".into(), wait: Some(1), ..Default::default() }, TileAction::default()], ..Default::default() };
+        let err = perform(&a).unwrap_err();
+        assert!(err.starts_with("step 2:"), "{err}");
+    }
+
+    #[test]
+    fn perform_wait_caps_at_sixty_seconds_and_returns_ok() {
+        let a = TileAction { kind: "wait".into(), wait: Some(1), ..Default::default() };
+        assert_eq!(perform(&a).unwrap(), None);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn mouse_summon_parse() {
+        let c = mouse_summon::parse("Ctrl+Mouse5").unwrap();
+        assert!(c.ctrl && !c.alt && c.xbutton == 2);
+        assert!(mouse_summon::parse("Ctrl+F").is_none());
+        assert!(mouse_summon::parse("Mouse4").unwrap().xbutton == 1);
+    }
+}
