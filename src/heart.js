@@ -60,8 +60,12 @@
   }
 
   function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    // Render at device resolution so particles stay crisp on HiDPI displays.
+    const dpr = window.devicePixelRatio || 1;
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx = W / 2; cy = H / 2; R = Math.min(W, H) * 0.34;
   }
 
@@ -132,5 +136,8 @@
     start, stop,
   };
 
-  resize(); build(); start();
+  // The window starts hidden: only animate once it's actually in front.
+  // (focus/visibility listeners above resume it on summon.)
+  resize(); build();
+  if (document.hasFocus() && !document.hidden) start();
 })();

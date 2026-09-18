@@ -153,7 +153,9 @@ async function refreshMonitors() {
     const mons = await invoke("list_monitors");
     const w = mons.reduce((a, m) => a + m.width, 0);
     const h = mons.reduce((a, m) => Math.max(a, m.height), 0);
-    els.monitors.textContent = `⧉ ${mons.length} display${mons.length === 1 ? "" : "s"} · ${w}×${h}`;
+    els.monitors.textContent =
+      `⧉ ${mons.length} display${mons.length === 1 ? "" : "s"} · ${w}×${h}` +
+      (window.__fayHost ? ` · ${window.__fayHost}` : "");
   } catch (e) {
     els.monitors.textContent = "⧉ —";
   }
@@ -216,6 +218,9 @@ function wireInput() {
   window.addEventListener("focus", () => {
     if (window.__fayAccent === "auto") applyAccent("auto");
   });
+  // losing focus hides the window (backend); return the deck to rest so the
+  // next summon starts clean and the running-poll stops.
+  window.addEventListener("blur", () => { if (isOpen()) closeDeck(); });
 }
 
 // ---- config ---------------------------------------------------------------
@@ -230,7 +235,15 @@ async function loadConfig() {
   if (invoke) {
     let text = null;
     try { text = await invoke("load_config"); } catch (e) { warn(`config read failed: ${e}`); }
-    if (text) return { cfg: JSON.parse(text), seeded: false };
+    if (text) {
+      try {
+        return { cfg: JSON.parse(text), seeded: false };
+      } catch (e) {
+        // Never touch the user's file; run on the bundled default so Fay stays usable.
+        warn(`your config has a syntax error (${e.message}) — using defaults until it's fixed`);
+        return { cfg: JSON.parse(await bundled()), seeded: false, broken: true };
+      }
+    }
     const txt = await bundled();
     try {
       const path = await invoke("save_config", { text: txt });
@@ -243,12 +256,30 @@ async function loadConfig() {
   return { cfg: JSON.parse(await bundled()), seeded: false };
 }
 
+// Per-machine overrides: cfg.machines[<HOSTNAME>].tiles[<id>] is merged onto
+// the tile with that id, so one config can carry different paths per PC.
+async function applyMachineProfile(cfg) {
+  if (!invoke) return null;
+  let host = null;
+  try { host = (await invoke("get_hostname")) || null; } catch (e) { return null; }
+  if (!host || !cfg.machines) return host;
+  const key = Object.keys(cfg.machines).find((k) => k.toUpperCase() === host);
+  const prof = key && cfg.machines[key];
+  if (!prof || !prof.tiles) return host;
+  for (const item of [...(cfg.scenes || []), ...(cfg.apps || [])]) {
+    const o = prof.tiles[item.id];
+    if (o && typeof o === "object") Object.assign(item, o);
+  }
+  return host;
+}
+
 async function main() {
   startClock();
   wireInput();
   let showNow = false;
   try {
-    const { cfg, seeded, path } = await loadConfig();
+    const { cfg, seeded, path, broken } = await loadConfig();
+    window.__fayHost = await applyMachineProfile(cfg);
     const app = cfg.app || {};
     if (app.name) els.brand.textContent = app.name.toUpperCase();
 
@@ -269,7 +300,9 @@ async function main() {
     (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
     renumber();
     refreshRunning();
-    setInterval(() => { if (isOpen()) refreshRunning(); }, 5000);
+    // Poll only while the deck is open AND the window is actually in front —
+    // otherwise a hidden window would keep spawning the process check forever.
+    setInterval(() => { if (isOpen() && document.hasFocus()) refreshRunning(); }, 5000);
 
     // Direct hotkeys: any tile with a `hotkey` fires without opening Fay.
     const bindings = [...(cfg.scenes || []), ...(cfg.apps || [])]
@@ -287,8 +320,9 @@ async function main() {
     }
 
     if (seeded) setStatus(`config created — edit it via tray › Open config file`, "is-flash", 8000);
-    // Start hidden by default (tray + hotkey); show on first run or if configured.
-    showNow = seeded || app.startHidden === false;
+    // Start hidden by default (tray + hotkey); show on first run, on a broken
+    // config (so the warning is seen), or if configured.
+    showNow = seeded || !!broken || app.startHidden === false;
   } catch (e) {
     warn(`config error: ${e.message}`);
     showNow = true; // make the problem visible

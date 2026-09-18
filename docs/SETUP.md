@@ -177,6 +177,26 @@ configure. Protocol targets (`steam://`, `ms-phone:`) have no icon, so those
 tiles keep their glyph. To force a specific image, set `"icon"` on the tile to a
 URL or a `data:` URL.
 
+## Per-machine profiles
+
+Same config on two PCs but different install paths? Add a `machines` block keyed
+by the computer name (shown in Fay's footer, and in Settings › About). Anything
+under `tiles.<id>` is merged onto that tile on that machine only:
+
+```json
+"machines": {
+  "DESKTOP-GAMING": {
+    "tiles": {
+      "zen":  { "target": "D:\\Apps\\Zen\\zen.exe" },
+      "game": { "audioOut": "Speakers (Realtek Audio)" }
+    }
+  }
+}
+```
+
+Any tile field can be overridden (`target`, `audioOut`, `hotkey`, `elevated`,
+`process`, `icon`, `hint`). Machine names are matched case-insensitively.
+
 ## Running-app indicator
 
 Apps that are already open show a small glowing dot in the tile's corner
