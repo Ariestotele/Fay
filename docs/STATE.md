@@ -9,8 +9,10 @@ structure, Heart extras, search, voice, AI + picker, plus a second static
 debug round. Everything compiles on Windows CI; **none of it has been run by
 a human yet** — the next thing that matters is the owner installing the
 newest CI artifact and reporting what actually works. Expect a fix-up round.
-v0.1.0 on Releases is far behind `main`; bump `package.json` to 0.2.0 to
-publish everything as a Release.
+**v0.2.0 is published on Releases** with everything up to Phase 22. (Its
+page also carries a stale `Fay_0.1.0_x64-setup.exe` picked up from the CI
+cache — harmless, delete it from the release's edit page if it bothers you;
+the workflows now clear old bundles before building.)
 
 ## ✅ Done (all merged)
 
