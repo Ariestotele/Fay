@@ -73,6 +73,11 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
       - name: Install Tauri CLI
         run: npm install
+      # The cargo cache restores src-tauri/target, so older installers can
+      # linger in the bundle dir: clear it so the artifact holds one file.
+      - name: Clear old bundles
+        shell: pwsh
+        run: Remove-Item -Recurse -Force src-tauri/target/release/bundle -ErrorAction SilentlyContinue
       - name: Build installer (NSIS)
         run: npx tauri build --bundles nsis
       - name: Upload installer
