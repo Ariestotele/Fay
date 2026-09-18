@@ -1,5 +1,17 @@
 # Setup
 
+## Easiest: install from the CI build (no toolchain)
+
+Every push to `main` builds a Windows installer automatically:
+
+1. Open the repo's **Actions** tab → the latest **CI** run on `main`.
+2. Scroll to **Artifacts** → download **`Fay-windows-installer`** (a zip).
+3. Unzip and run `Fay_…_x64-setup.exe`. Fay installs and starts (tray icon).
+4. Summon with **Ctrl+Alt+Space**.
+
+That's it — no Rust or Node needed. Use the sections below only if you want to
+develop or run from source.
+
 ## Prerequisites (Windows)
 
 1. **PowerToys** — install from the Microsoft Store or
