@@ -45,7 +45,15 @@ fire(action)              // perform any tile: launch / system / media / snippet
 set_clipboard(text)       // native CF_UNICODETEXT (calculator "Enter copies")
 set_summon_monitor(mode)  // "cursor" (monitor under the mouse) or "current"
 list_commands(dir?)       // scripts in the commands folder → tiles
+get_stats()               // CPU / RAM / NET via sysinfo (+ GPU via nvidia-smi)
+notify(title, body)       // Windows toast (focus timer done while hidden)
 ```
+
+The Heart exposes `setStats`, `setStatsVisible`, `setProgress` (focus arc) and
+`pulse()` (a one-second burst used for "done" and, later, spoken replies).
+The focus timer itself is frontend state (`window.__fayFocus`); a hotkey
+reaches it through a `kind: "focus"` action that the backend turns into an
+`eval` on the main window.
 
 `TileAction` is recursive: `multi` carries `steps` (each a TileAction, or
 `wait`), `close` carries `closes`. Folders are frontend-only (`children`); the

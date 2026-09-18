@@ -9,7 +9,8 @@
     "autostart": false,
     "accent": "auto",
     "backdrop": 0.62,
-    "startHidden": true
+    "startHidden": true,
+    "stats": true
   },
   "scenes": [
     {
@@ -58,7 +59,8 @@
   "system": [
     { "id": "winddown", "name": "Wind down", "glyph": "☾", "actions": [
       { "kind": "media", "action": "playpause" }, { "wait": 400 }, { "kind": "system", "action": "lock" }
-    ], "hint": "pause music, then lock" }
+    ], "hint": "pause music, then lock" },
+    { "id": "focus", "name": "Focus 25", "glyph": "◔", "kind": "focus", "minutes": 25, "hotkey": "Ctrl+Alt+F", "hint": "pomodoro · again to stop" }
   ],
   "packs": ["power", "media"],
   "commands": true,

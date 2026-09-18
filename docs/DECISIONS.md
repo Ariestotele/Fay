@@ -287,3 +287,19 @@ footer note rather than an error. The commands folder is
 become tiles at load, and `.ps1` targets now run via `powershell -File` with
 Bypass because the .ps1 shell association is "edit". Rust gains `expand_env`
 for paths it hands to PowerShell (cmd.exe expanded `%VAR%` for us before).
+
+### 2026-09-18 — Phase 19 (batch 3): live stats + focus timer on the Heart
+Stats come from the `sysinfo` crate kept in Tauri state (CPU and network are
+deltas between polls, so the first sample is empty) rather than PowerShell
+counters, which cost a ~1 s sample each; GPU is `nvidia-smi` when present and
+simply absent otherwise. Polled every 2.5 s only while Fay is in front, drawn
+by the Heart at rest and hidden behind the open deck, and rendered as text
+plus **dotted gauges** — no solid lines, per the Heart's earlier design
+decision. The focus timer is frontend state so it survives the window being
+hidden (JS timers keep running); the Heart draws a dotted progress arc just
+outside the main ring, the remaining time sits in the footer, and completion
+pulses the Heart, raises a Windows toast (via PowerShell + WinRT using
+PowerShell's own AppUserModelId, since Fay isn't registered for toasts) and
+calls `window.__faySay` if voice is present. A `focus` hotkey reaches the
+frontend through `eval` from the backend (`APP` handle), the one action that
+doesn't run in Rust.

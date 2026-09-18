@@ -331,6 +331,28 @@ hidden with `-ExecutionPolicy Bypass`; `.bat` files open their console as usual.
 `"commands": false` turns this off; `"commands": "D:\\scripts"` uses another
 folder (`%VAR%` allowed).
 
+## Live stats around the Heart
+
+At rest, four readouts orbit the rings: **CPU**, **RAM** (used / total),
+**GPU** (load + temperature, NVIDIA only via `nvidia-smi`; hidden otherwise)
+and **NET** (down / up per second), each with a dotted gauge. They refresh
+every 2.5 s only while Fay is in front and disappear behind the open deck.
+`"stats": false` in `app` turns them off; `"statsInterval": 5000` slows them.
+
+## Focus timer (pomodoro)
+
+A `focus` tile starts a countdown; the Heart grows a dotted arc that fills as
+time passes and the remaining time sits in the footer:
+
+```json
+{ "id": "focus", "name": "Focus 25", "kind": "focus", "minutes": 25, "hotkey": "Ctrl+Alt+F" }
+```
+
+Clicking a running focus tile (or its hotkey) stops it; `"action": "stop"`
+makes a dedicated stop tile. When time is up the Heart pulses, a Windows toast
+appears (so you see it even with Fay hidden) and, once voice is enabled, Fay
+says so. The `focus` pack has Focus 25 / Focus 50 / Stop.
+
 ## Which monitor Fay opens on
 
 `"summonOn": "cursor"` (default) shows Fay on the monitor under the mouse;

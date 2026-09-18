@@ -8,8 +8,8 @@ candidate, built as six batches (one PR each, auto-merged on green).** Batch 1
 (Phase 17) is in PR. Order: 1 quick wins → 2 deck structure (folders,
 multi-action, teardown, command folder) → 3 Heart extras (stats, timer) →
 4 search (clipboard, Everything, bookmarks) → 5 voice (TTS + push-to-talk) →
-6 AI (NL bar, screen-aware, agentic) → path picker → debug round. Batches 1
-and 2 merged (Phases 17–18). v0.1.0 is on Releases; every push to `main`
+6 AI (NL bar, screen-aware, agentic) → path picker → debug round. Batches
+1–3 merged (Phases 17–19). v0.1.0 is on Releases; every push to `main`
 uploads a fresh installer artifact. Owner has not yet runtime-tested.
 
 ## ✅ Done (all merged)
@@ -35,7 +35,8 @@ uploads a fresh installer artifact. Owner has not yet runtime-tested.
 | 15 | README rewritten as the product front door — preview, 30-second install, feature table, full config reference |
 | 16 | Ctrl+Mouse5 summon — `app.mouseSummon`, WH_MOUSE_LL hook thread (`windows-sys`), swallows the click; `set_mouse_summon` |
 | 17 | **Batch 1 / quick wins** — tile `kind`s (system / media / snippet) via one `TileAction` + `fire`; packs (`power media tools settings links`) into a `system` group; quicklinks (`{query}` + `keyword`); calculator + unit conversion on the filter line (`= …`, Enter copies); config validation with line/col; `summonOn: "cursor"`; press-twice confirm for destructive actions |
-| 18 | **Batch 2 / deck structure** — folders (`children`, sub-deck + breadcrumb, Esc/Backspace up); multi-action tiles (`actions` steps + `wait`); scene teardown (`closes`, Shift+click / × / `closeHotkey`, `!` = force); commands folder (`commands`, tray › Open commands folder, `.ps1` via `powershell -File`) (in PR) |
+| 18 | **Batch 2 / deck structure** — folders (`children`, sub-deck + breadcrumb, Esc/Backspace up); multi-action tiles (`actions` steps + `wait`); scene teardown (`closes`, Shift+click / × / `closeHotkey`, `!` = force); commands folder (`commands`, tray › Open commands folder, `.ps1` via `powershell -File`) |
+| 19 | **Batch 3 / Heart extras** — live CPU · RAM · GPU · NET readouts with dotted gauges around the rings (`get_stats`, sysinfo + nvidia-smi, `app.stats`); focus timer (`kind: "focus"`, `minutes`, dotted progress arc, footer countdown, toast + `Heart.pulse()` on done, `focus` pack) (in PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -65,8 +66,8 @@ Keypirinha / Listary / ueli / Wox, Stream Deck-style macro software, and the
 "AI Jarvis" launcher wave (Raycast AI, Open.Jarvis, Cluely/Highlight). Effort:
 S = frontend/config only, M = a Rust command or two, L = new subsystem.
 **Owner said "do them all"** — batches: 1 = #1 2 3 8 10 12 16 17 18 (✅ Phase 17);
-2 = #4 5 6 11 (✅ Phase 18); 3 = #13 14; 4 = #7 9 15; 5 = C B; 6 = A D E; then
-#19. #20 needs a purchased certificate (owner).
+2 = #4 5 6 11 (✅ Phase 18); 3 = #13 14 (✅ Phase 19); 4 = #7 9 15; 5 = C B;
+6 = A D E; then #19. #20 needs a purchased certificate (owner).
 
 ### AI — "talk to Fay" (the viral category)
 

@@ -40,6 +40,14 @@
       { "id": "set-apps",      "name": "Installed apps", "glyph": "▤", "target": "ms-settings:appsfeatures" }
     ]
   },
+  "focus": {
+    "group": "system",
+    "tiles": [
+      { "id": "focus-25",   "name": "Focus 25",   "glyph": "◔", "kind": "focus", "minutes": 25, "hint": "pomodoro · click again to stop" },
+      { "id": "focus-50",   "name": "Focus 50",   "glyph": "◑", "kind": "focus", "minutes": 50 },
+      { "id": "focus-stop", "name": "Stop focus", "glyph": "◌", "kind": "focus", "action": "stop" }
+    ]
+  },
   "links": {
     "group": "apps",
     "tiles": [
