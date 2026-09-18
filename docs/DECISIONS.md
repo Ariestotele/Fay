@@ -185,3 +185,21 @@ in PowerShell, and returns a PNG data URL; results are cached as PNGs in the app
 cache dir keyed by a hash of the target. Protocol targets have no icon and keep
 the glyph. An explicit `icon` on a tile overrides. Base64 is hand-rolled (~40
 lines) rather than adding a crate for one use.
+
+### 2026-09-18 — Phase 13: running-app indicator
+A `list_running` command returns running process names (PowerShell
+`Get-Process`, lowercase, unique). The frontend derives an expected process name
+per tile from its target (basename without extension; protocol scheme for
+`steam://`-style targets) with an explicit `process` override, and marks matches
+with a glowing dot. Polled only when the deck opens and every 5s while open, so
+it costs nothing at rest. Heuristic by design — the override covers the misses.
+
+### 2026-09-18 — Phase 11 revised: releases on version bump, not tags
+Tag pushes are rejected by the session's git integration (only the designated
+branch is accepted), and `workflow_dispatch` is unavailable to the integration
+token, so a tag-triggered release could never be fired from here. `release.yml`
+now runs on pushes to `main`: a `check` job reads `version` from package.json
+and asks `gh release view v<version>`; if absent, the `release` job builds the
+installer and publishes the release, creating the tag itself
+(`softprops/action-gh-release` with `tag_name` + `target_commitish`). Shipping is
+therefore "bump the version, merge to main". Supersedes the tag-trigger entry.

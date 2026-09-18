@@ -110,6 +110,11 @@ body.open .clock { opacity: 0; }
 .tile__idx { color: var(--dim); font-size: 10px; }
 .tile__idx:not(:empty)::after { content: " · "; }
 .tile.is-hidden { display: none; }
+.tile.is-running::before {
+  content: ""; position: absolute; top: 7px; left: 7px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent);
+}
 
 .filter {
   min-height: 18px;

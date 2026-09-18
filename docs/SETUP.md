@@ -12,9 +12,11 @@ Every push to `main` builds a Windows installer automatically:
 That's it — no Rust or Node needed. Use the sections below only if you want to
 develop or run from source.
 
-**Even easier:** tagged versions are published on the **Releases** page with the
-installer attached — https://github.com/Ariestotele/Fay/releases — no need to
-open the Actions tab at all.
+**Even easier:** released versions are published on the **Releases** page with
+the installer attached — https://github.com/Ariestotele/Fay/releases — no need
+to open the Actions tab at all. A release is created automatically whenever
+`main` carries a new `version` (bump it in `package.json`,
+`src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, merge, done).
 
 ## Where your config lives (installed build)
 
@@ -174,6 +176,14 @@ target (exe, `.lnk` shortcut, or a command on PATH) and caches it. Nothing to
 configure. Protocol targets (`steam://`, `ms-phone:`) have no icon, so those
 tiles keep their glyph. To force a specific image, set `"icon"` on the tile to a
 URL or a `data:` URL.
+
+## Running-app indicator
+
+Apps that are already open show a small glowing dot in the tile's corner
+(refreshed when the deck opens and every 5s while it's open). Fay guesses the
+process name from the target (`…\zen.exe` → `zen`, `Discord.lnk` → `discord`,
+`steam://` → `steam`). If a guess is wrong, set `"process"` on the tile to the
+name shown in Task Manager's *Details* tab (without `.exe`).
 
 ## Keyboard (when the deck is open)
 
