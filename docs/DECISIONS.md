@@ -126,3 +126,11 @@ config-driven with `accent: "auto"` matching the live Windows accent color
 alwaysOnTop + skipTaskbar + transparent, sized to the active monitor on show.
 Mouse-button summon (Mouse5) still parked. Tile grid kept (centered chips) for
 usability rather than fully orbital.
+
+### 2026-09-18 — Phase 7: CI-built installer as the primary test path
+The owner never ran Fay because it needed Rust + Node. CI now builds an NSIS
+installer (`tauri build --bundles nsis`) on every push to `main` (and on manual
+dispatch) and uploads it as the `Fay-windows-installer` artifact. Installing
+that artifact is the documented first-choice way to try Fay; source builds are
+for development only. NSIS only (no MSI) to keep the job fast and avoid the WiX
+download.
