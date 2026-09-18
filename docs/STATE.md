@@ -3,14 +3,14 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** **"Do them all" run — owner asked for every pipeline
-candidate, built as six batches (one PR each, auto-merged on green).** Batch 1
-(Phase 17) is in PR. Order: 1 quick wins → 2 deck structure (folders,
-multi-action, teardown, command folder) → 3 Heart extras (stats, timer) →
-4 search (clipboard, Everything, bookmarks) → 5 voice (TTS + push-to-talk) →
-6 AI (NL bar, screen-aware, agentic) → path picker → debug round. Batches
-1–5 merged (Phases 17–21). v0.1.0 is on Releases; every push to `main`
-uploads a fresh installer artifact. Owner has not yet runtime-tested.
+**Current phase:** **The whole researched pipeline is built — Phases 1–22.**
+The "do them all" run shipped six batches (PRs #18–#22): quick wins, deck
+structure, Heart extras, search, voice, AI + picker, plus a second static
+debug round. Everything compiles on Windows CI; **none of it has been run by
+a human yet** — the next thing that matters is the owner installing the
+newest CI artifact and reporting what actually works. Expect a fix-up round.
+v0.1.0 on Releases is far behind `main`; bump `package.json` to 0.2.0 to
+publish everything as a Release.
 
 ## ✅ Done (all merged)
 
@@ -38,7 +38,8 @@ uploads a fresh installer artifact. Owner has not yet runtime-tested.
 | 18 | **Batch 2 / deck structure** — folders (`children`, sub-deck + breadcrumb, Esc/Backspace up); multi-action tiles (`actions` steps + `wait`); scene teardown (`closes`, Shift+click / × / `closeHotkey`, `!` = force); commands folder (`commands`, tray › Open commands folder, `.ps1` via `powershell -File`) |
 | 19 | **Batch 3 / Heart extras** — live CPU · RAM · GPU · NET readouts with dotted gauges around the rings (`get_stats`, sysinfo + nvidia-smi, `app.stats`); focus timer (`kind: "focus"`, `minutes`, dotted progress arc, footer countdown, toast + `Heart.pulse()` on done, `focus` pack) |
 | 20 | **Batch 4 / search** — results mode (rows replace the grid): `>` files via Everything `es.exe` (`app.everything`), `@` browser bookmarks (Zen/Firefox jsonlz4 + Chromium JSON, `lz4_flex`), clipboard history (memory only, `kind: "clipboard"` tile + `Ctrl+Alt+V`, Enter pastes) (in PR) |
-| 21 | **Batch 5 / voice** — persistent `System.Speech` PowerShell process (`voice_config`, `say`, `listen`, `set_voice_grammar`); per-tile `say`, `kind: "say"` / `"listen"` tiles; grammar from tile names; `Heart.talk/listen`; `app.voice*` (in PR) |
+| 21 | **Batch 5 / voice** — persistent `System.Speech` PowerShell process (`voice_config`, `say`, `listen`, `set_voice_grammar`); per-tile `say`, `kind: "say"` / `"listen"` tiles; grammar from tile names; `Heart.talk/listen`; `app.voice*` |
+| 22 | **Batch 6 / AI + picker** — natural-language bar (Enter on no-match or `?`), JSON plan → `TileAction` multi, bounded retry loop, destructive gate; screen-aware ask (`kind: "ask"`, `Ctrl+Alt+A`, capture-before-show); Anthropic or Ollama (`app.ai`); `+ Add app` picker (`pick_file`, `addTile`); debug round 2 (`-EncodedCommand`, history normalization, confirm gates) (in PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -60,6 +61,8 @@ uploads a fresh installer artifact. Owner has not yet runtime-tested.
 - [ ] Install **SoundVolumeView.exe** (PATH or beside Fay) for scene `audioOut`.
 - [ ] Install **Everything** + its `es.exe` CLI (PATH, or `app.everything`) for `>` file search.
 - [ ] Try voice: press `Ctrl+Alt+L`, say *"game"*. If the mic isn't picked up, check Windows › Privacy › Microphone.
+- [ ] For AI: put your Anthropic key in `app.ai.apiKey` in the **local** config (tray › Open config file), or run Ollama and set `"provider": "ollama"`. Then type *"game mode but keep audio on speakers"* and press Enter; try `Ctrl+Alt+A` on an error dialog.
+- [ ] Decide on code signing (#20): a certificate costs money; without it SmartScreen shows "More info → Run anyway" once per install.
 - [ ] Runtime checks: tray appears, Ctrl+Alt+Space toggles, a UAC tile prompts,
       footer shows real monitor count, accent matches Windows.
 
@@ -71,8 +74,9 @@ Keypirinha / Listary / ueli / Wox, Stream Deck-style macro software, and the
 S = frontend/config only, M = a Rust command or two, L = new subsystem.
 **Owner said "do them all"** — batches: 1 = #1 2 3 8 10 12 16 17 18 (✅ Phase 17);
 2 = #4 5 6 11 (✅ Phase 18); 3 = #13 14 (✅ Phase 19); 4 = #7 9 15 (✅ Phase 20);
-5 = C B (✅ Phase 21); 6 = A D E; then #19. #20 needs a purchased certificate
-(owner).
+5 = C B (✅ Phase 21); 6 = A D E + #19 (✅ Phase 22). **All done except #20**,
+which needs a purchased code-signing certificate (owner decision). Currency
+conversion (#16, network part) is still out — the AI bar answers those.
 
 ### AI — "talk to Fay" (the viral category)
 

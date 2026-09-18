@@ -41,6 +41,8 @@ Every push to `main` also produces a fresh installer under
 | **Focus timer** | A pomodoro tile; the Heart's outer arc fills as time passes, a toast fires when it's up. |
 | **Search** | `> name` finds files via Everything, `@ name` searches your browser bookmarks, `Ctrl+Alt+V` opens clipboard history (memory only). |
 | **Voice** | Offline, built into Windows. Tiles can `say` a reply; press *Listen* and say *"game"* or *"open discord"*. The Heart wobbles while it talks. |
+| **AI** | Type *"game mode but keep audio on speakers"* — Fay's model picks the actions and replies. Screen-aware questions with `Ctrl+Alt+A`. Anthropic API key or local Ollama. |
+| **Add app** | A dashed *+* tile opens a file picker and writes the tile into your config. |
 | **Real icons** | Each tile shows its app's actual icon, extracted and cached automatically. |
 | **Running dot** | Apps already open get a glowing dot, so a scene doesn't relaunch them by surprise. |
 | **Accent auto** | Colors follow your Windows accent color (or pin a hex). |
@@ -93,6 +95,8 @@ Notepad. Save, then tray › **Reload config**.
 | `bookmarks` / `everything` | `app` | Bookmark search on/off; path to Everything's `es.exe` if not on PATH. |
 | `voice` / `voiceRate` / `voiceName` / `voiceConfirm` | `app` | Speech on/off, speed (−10…10), installed voice name, spoken "Opening …" acknowledgement. |
 | `say` | tile | Spoken after the tile fires. `kind: "say"` + `text` speaks on its own; `kind: "listen"` starts tap-to-talk. |
+| `ai` | `app` | `{ "provider": "anthropic" \| "ollama", "model", "apiKey", "ollamaUrl" }` or `false`. Key stays in your local config. `kind: "ask"` tiles ask about the screen. |
+| `addTile` | `app` | Show the *+ Add app* picker tile (default on). |
 | `minutes` | tile | With `"kind": "focus"`: start a focus timer of that length (`"action": "stop"` for a stop tile). |
 | `packs` | root | Preset tile sets: `power`, `media`, `tools`, `settings`, `links`. See [docs/SETUP.md](docs/SETUP.md). |
 | `system` | root | A third tile group, next to `scenes` and `apps`. |
@@ -138,4 +142,4 @@ The project's working memory is in `docs/`: **STATE.md** (what's done / next),
 
 ## Status
 
-Twenty-one phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
+Twenty-two phases shipped and CI-green — the whole researched pipeline. See [docs/STATE.md](docs/STATE.md).

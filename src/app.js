@@ -34,7 +34,9 @@ const invoke =
 // focus:   minutes = N starts the focus timer (action "stop" / "toggle")
 // clipboard: opens the clipboard history list
 // say:     text is spoken (voice); listen: tap-to-talk, say a tile's name
-const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder", "focus", "clipboard", "say", "listen"]);
+// ask:     screen-aware question (captures the window in front, then asks)
+// add:     "browse…" picker that appends an app tile to your config
+const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder", "focus", "clipboard", "say", "listen", "ask", "add"]);
 const SYSTEM_ACTIONS = new Set(["lock", "sleep", "hibernate", "restart", "shutdown", "logoff", "recycle", "darkmode"]);
 const MEDIA_ACTIONS = new Set(["playpause", "play", "pause", "next", "prev", "previous", "stop", "mute", "volup", "voldown"]);
 const CONFIRM_ACTIONS = new Set(["restart", "shutdown", "logoff", "hibernate"]);
@@ -89,7 +91,11 @@ function allTiles(cfg) { const out = []; walkTiles(cfg, (t) => out.push(t)); ret
 
 // ---- open / rest state ----------------------------------------------------
 function openDeck() { document.body.classList.add("open"); refreshRunning(); heartStats(false); }
-function closeDeck() { document.body.classList.remove("open"); leaveFolders(); search.clipboard = false; setFilter(""); heartStats(true); }
+function closeDeck() {
+  document.body.classList.remove("open"); leaveFolders(); search.clipboard = false;
+  ai.screen = false; ai.answerShown = false; ai.history = []; search.mode = null; renderResults(null);
+  setFilter(""); heartStats(true);
+}
 function isOpen() { return document.body.classList.contains("open"); }
 const heartStats = (v) => { if (window.Heart) window.Heart.setStatsVisible(v); };
 
@@ -231,6 +237,10 @@ function setFilter(q) {
     t.classList.toggle("is-hidden", hide);
   }
   renumber();
+  // Nothing matched a tile name: Enter hands the line to the AI instead.
+  if (raw && !currentQuicklink && currentAnswer == null && ai.enabled && !visibleTiles().length) {
+    els.filter.innerHTML += `<span class="filter__hint">Enter asks Fay</span>`;
+  }
 }
 
 // ---- results mode: file search (">"), bookmarks ("@"), clipboard history ----
@@ -244,9 +254,22 @@ function updateResults(raw) {
   if (clipMode()) { mode = "clipboard"; }
   else if (raw.startsWith(">") && search.files) { mode = "files"; q = raw.slice(1).trim(); }
   else if (raw.startsWith("@") && search.bookmarks) { mode = "bookmarks"; q = raw.slice(1).trim(); }
+  else if (raw.startsWith("?") || ai.screen) { mode = "ask"; q = raw.replace(/^\?\s*/, ""); }
   if (!mode) {
     if (search.mode) { search.mode = null; renderResults(null); }
     return false;
+  }
+  if (mode === "ask") {
+    // Just a prompt line; Enter sends it (see the key handler).
+    search.mode = "ask";
+    currentQuicklink = null; currentAnswer = null;
+    els.filter.innerHTML = `<span class="filter__kw">${ai.screen ? "📷 ask about the screen" : "ask Fay"}</span> › ${escapeHtml(q)}` +
+      `<span class="filter__hint">${ai.ready ? "Enter sends" : ai.status}</span>`;
+    els.filter.classList.add("is-active");
+    for (const t of document.querySelectorAll(".tile")) t.classList.add("is-hidden");
+    search.emptyMsg = ai.screen ? "the window in front was captured — ask about it" : "e.g. “game mode but keep audio on speakers”";
+    if (!ai.answerShown) renderResults([]);
+    return true;
   }
   search.mode = mode;
   currentQuicklink = null; currentAnswer = null;
@@ -342,6 +365,200 @@ async function provideFiles(q) {
   }));
 }
 
+// ---- AI: natural-language deck control ------------------------------------
+// The model gets the deck as JSON and answers with a JSON plan; the plan runs
+// through the same TileAction path as clicks. Failed steps are reported back
+// once so the model can adjust (the "agentic" loop, bounded to 2 rounds).
+const ai = { enabled: false, ready: false, status: "AI off", history: [], screen: false, answerShown: false, busy: false, cfg: null };
+
+function deckForModel(cfg) {
+  const rows = [];
+  walkTiles(cfg, (t) => {
+    const k = kindOf(t);
+    if (k === "folder" || k === "add" || k === "ask" || !t.id) return;
+    const row = { id: t.id, name: t.name, kind: k };
+    if (t.hint) row.hint = oneLine(t.hint, 80);
+    if (t.audioOut) row.audioOut = t.audioOut;
+    if (canClose(t)) row.closes = t.closes;
+    if (k === "system" || k === "media") row.action = t.action;
+    if (isQuicklink(t)) row.keyword = keywordOf(t);
+    rows.push(row);
+  });
+  return rows;
+}
+
+function aiSystemPrompt() {
+  const deck = JSON.stringify(deckForModel(ai.cfg));
+  return `You are Fay, a desktop command deck on the user's Windows PC. The user types (or says) a request; you decide which deck actions to run and reply in ONE short spoken sentence.
+Deck tiles (JSON): ${deck}
+Action objects you may return:
+{"tile":"<id>"} fire that tile · {"tile":"<id>","audioOut":"<device name>"} fire it but switch audio to that device instead ("" = don't switch audio) · {"tile":"<id>","query":"<text>"} for a quicklink · {"close":"<id>"} close what that scene opened · {"kind":"system","action":"lock|sleep|hibernate|restart|shutdown|logoff|recycle|darkmode"} · {"kind":"media","action":"playpause|next|prev|stop|mute|volup|voldown"} · {"kind":"focus","minutes":25} or {"kind":"focus","action":"stop"} · {"wait":1500} pause ms · {"say":"<text>"} speak · {"open":"<url, file path or command>"} only when the user explicitly asks for something not on the deck.
+Rules: respond with ONLY a JSON object {"reply":"<one sentence>","actions":[...],"question":false}. Prefer deck tiles over "open". For shutdown/restart/logoff/hibernate or anything ambiguous, do NOT act: set "question":true and ask in "reply"; if the user then confirms, act. If the user is just asking something (or about a screenshot), answer in "reply" (up to three sentences) with "actions":[]. Never invent tile ids.`;
+}
+
+function parsePlan(text) {
+  const s = String(text).trim();
+  const m = s.match(/\{[\s\S]*\}/);
+  if (!m) return { reply: s, actions: [] };
+  try { const o = JSON.parse(m[0]); return { reply: o.reply || "", actions: Array.isArray(o.actions) ? o.actions : [], question: !!o.question }; }
+  catch (e) { return { reply: s, actions: [] }; }
+}
+
+function tileById(id) { let hit = null; walkTiles(ai.cfg, (t) => { if (!hit && t.id === id) hit = t; }); return hit; }
+
+// Destructive system actions only run when the user's own last words clearly
+// asked for / confirmed them — never on the model's initiative alone.
+const CONFIRM_WORDS = /\b(yes|yeah|yep|confirm|do it|go ahead|sure|ok|okay|shut ?down|power off|restart|reboot|sign out|log ?off|hibernate)\b/i;
+function userConfirmed() {
+  const last = [...ai.history].reverse().find((m) => m.role === "user");
+  return !!last && CONFIRM_WORDS.test(last.content);
+}
+
+// Anthropic wants strictly alternating roles starting with "user": merge
+// neighbours with the same role and drop a leading assistant turn.
+function normalizeHistory(list) {
+  const out = [];
+  for (const m of list) {
+    if (!out.length && m.role !== "user") continue;
+    if (out.length && out[out.length - 1].role === m.role) out[out.length - 1] = { role: m.role, content: `${out[out.length - 1].content}\n${m.content}` };
+    else out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
+// Turn a plan action into a TileAction step (or null if it's invalid).
+function stepFromPlan(a) {
+  if (!a || typeof a !== "object") return null;
+  if (a.wait != null) return { kind: "wait", wait: Math.min(60000, Number(a.wait) || 0) };
+  if (a.say) return { kind: "say", text: String(a.say) };
+  if (a.close) { const t = tileById(String(a.close)); return t && canClose(t) ? closeActionOf(t) : null; }
+  if (a.tile) {
+    const t = tileById(String(a.tile));
+    if (!t) return null;
+    const k = kindOf(t);
+    if (k === "folder" || k === "add" || k === "ask") return null;
+    if (needsConfirm(t) && !userConfirmed()) return null;
+    const step = actionOf(t, a.query != null ? String(a.query) : undefined);
+    if ("audioOut" in a) step.audioOut = a.audioOut ? String(a.audioOut) : null;
+    step._label = t.name;
+    return step;
+  }
+  if (a.open) return { kind: "launch", target: String(a.open), elevated: false, audioOut: null, action: null, text: null, paste: true, steps: [], wait: null, closes: [], minutes: null, say: null };
+  if (a.kind === "system" && SYSTEM_ACTIONS.has(a.action)) return CONFIRM_ACTIONS.has(a.action) && !userConfirmed() ? null : { kind: "system", action: a.action };
+  if (a.kind === "media" && MEDIA_ACTIONS.has(a.action)) return { kind: "media", action: a.action };
+  if (a.kind === "focus") return { kind: "focus", minutes: Number(a.minutes) || 0, action: a.action || null };
+  return null;
+}
+
+async function runPlan(actions) {
+  const steps = [], skipped = [];
+  for (const a of actions) { const s = stepFromPlan(a); if (s) steps.push(s); else skipped.push(JSON.stringify(a)); }
+  if (!steps.length) return { ok: true, skipped, error: null };
+  // Frontend-only kinds run here; the rest go to the backend as one multi-action.
+  const fe = steps.filter((s) => s.kind === "focus" || s.kind === "clipboard");
+  for (const s of fe) { if (s.kind === "focus") window.__fayFocus(s.minutes, s.action || "start"); }
+  const be = steps.filter((s) => !fe.includes(s)).map((s) => { const { _label, ...rest } = s; return rest; });
+  if (!be.length) return { ok: true, skipped, error: null };
+  if (!invoke) { console.log("[preview] plan:", be); return { ok: true, skipped, error: null }; }
+  if (pastes({ steps: be })) await invoke("hide_window").catch(() => {});
+  try {
+    const w = await invoke("fire", { action: { kind: "multi", steps: be } });
+    return { ok: true, skipped, error: null, warning: w || null };
+  } catch (e) {
+    return { ok: false, skipped, error: String(e) };
+  }
+}
+
+function showAnswer(text, meta) {
+  ai.answerShown = true;
+  search.mode = "ask";
+  document.body.classList.add("results");
+  els.results.innerHTML = `<div class="row row--answer"><div class="answer__text">${escapeHtml(text)}</div>${meta ? `<div class="answer__meta">${escapeHtml(meta)}</div>` : ""}</div>`;
+}
+function clearAnswer() { ai.answerShown = false; ai.screen = false; search.mode = null; renderResults(null); }
+
+async function ask(text) {
+  const q = String(text || "").trim();
+  if (!q || ai.busy) return;
+  if (!ai.enabled) { warn("AI is off — add \"ai\": { \"apiKey\": \"…\" } to app (or use Ollama)"); return; }
+  ai.busy = true;
+  const withScreen = ai.screen;
+  ai.history.push({ role: "user", content: q });
+  ai.history = ai.history.slice(-8);
+  showAnswer("thinking…");
+  if (window.Heart) window.Heart.listen(20000);
+  try {
+    let plan = null, rounds = 0, note = "";
+    let messages = normalizeHistory(ai.history);
+    while (rounds < 3) {
+      rounds++;
+      const reply = await invoke("ai_ask", { system: aiSystemPrompt(), messages, withScreen: withScreen && rounds === 1 });
+      ai.history.push({ role: "assistant", content: reply });
+      plan = parsePlan(reply);
+      if (plan.question || !plan.actions.length) break;
+      const r = await runPlan(plan.actions);
+      if (r.ok) { note = r.warning ? `note: ${r.warning}` : `ran ${plan.actions.length} action${plan.actions.length === 1 ? "" : "s"}`; if (r.skipped.length) note += ` · skipped ${r.skipped.length}`; break; }
+      // Agentic retry: tell the model what failed and let it adjust once or twice.
+      const fb = `Step failed: ${r.error}${r.skipped.length ? `. Ignored invalid actions: ${r.skipped.join(", ")}` : ""}. Adjust the plan or explain in "reply".`;
+      ai.history.push({ role: "user", content: fb });
+      messages = normalizeHistory(ai.history.slice(-8));
+      note = `retrying after: ${r.error}`;
+      showAnswer(`${plan.reply}\n${note}`);
+    }
+    const reply = plan ? plan.reply : "";
+    showAnswer(reply || "(no reply)", note);
+    if (reply) window.__faySay(reply);
+    if (plan && plan.question) flash("Fay has a question — type your answer");
+  } catch (e) {
+    showAnswer(`AI error: ${e}`);
+    warn(`AI: ${e}`);
+  } finally {
+    ai.busy = false;
+    ai.screen = false;
+    if (window.Heart) window.Heart.quiet();
+  }
+}
+
+// Screen-aware ask (tile / hotkey): the backend already captured the window in
+// front and re-showed Fay; open the ask prompt with the screenshot attached.
+window.__fayAsk = (captured) => {
+  if (!isOpen()) openDeck();
+  leaveFolders();
+  ai.screen = !!captured;
+  if (!captured) warn("screen capture failed — asking without it");
+  setFilter("? ");
+};
+
+function startAi(app, cfg) {
+  ai.cfg = cfg;
+  const a = app.ai && typeof app.ai === "object" ? app.ai : {};
+  ai.enabled = app.ai !== false && (a.provider === "ollama" || !!a.apiKey || a.useEnvKey !== false);
+  if (!invoke) { ai.status = "AI (preview)"; ai.ready = ai.enabled; return; }
+  invoke("ai_config", { provider: a.provider || null, model: a.model || null, apiKey: a.apiKey || null, ollamaUrl: a.ollamaUrl || null })
+    .then((status) => { ai.status = status; ai.ready = status !== "no API key"; if (!ai.ready) ai.enabled = false; })
+    .catch((e) => { ai.status = String(e); ai.ready = false; });
+}
+
+// "+ Add app": native file picker → append a tile to the user config → reload.
+async function addAppTile() {
+  if (!invoke) { flash("(preview) would open a file picker"); return; }
+  let path = null;
+  try { path = await invoke("pick_file"); } catch (e) { warn(`picker: ${e}`); return; }
+  if (!path) return;
+  const base = path.split(/[\\/]/).pop().replace(/\.(exe|lnk|bat|cmd|ps1)$/i, "");
+  const id = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "app";
+  const raw = ai.raw || {};
+  raw.apps = Array.isArray(raw.apps) ? raw.apps : [];
+  let uid = id, n = 2;
+  while (allTiles(raw).some((t) => t.id === uid)) uid = `${id}-${n++}`;
+  raw.apps.push({ id: uid, name: base, glyph: "▪", target: path });
+  try {
+    await invoke("save_config", { text: JSON.stringify(raw, null, 2) });
+    flash(`added ${base} — reloading`);
+    setTimeout(() => location.reload(), 600);
+  } catch (e) { warn(`save: ${e}`); }
+}
+
 // ---- voice (Windows System.Speech via the backend) -------------------------
 const voice = { on: false, confirm: true, phrases: new Map() };
 window.__faySay = (text) => {
@@ -359,7 +576,7 @@ function buildVoiceGrammar(cfg) {
   voice.phrases.clear();
   const add = (phrase, fn) => { const k = phrase.toLowerCase().trim(); if (k && !voice.phrases.has(k)) voice.phrases.set(k, fn); };
   for (const t of allTiles(cfg)) {
-    if (!t.name) continue;
+    if (!t.name || needsConfirm(t)) continue; // no voice shutdown / restart
     const name = String(t.name).replace(/[^\w\s'+-]/g, " ").replace(/\s+/g, " ").trim();
     if (!name) continue;
     const go = () => fire(t);
@@ -574,6 +791,7 @@ async function fire(item, query) {
   if (kind === "folder") { openFolder(item); return; }
   if (kind === "focus") { fireFocus(item); return; }
   if (kind === "clipboard") { openClipboard(); return; }
+  if (kind === "add") { addAppTile(); return; }
   if (kind === "launch" && !item.target) return;
   if ((kind === "say" || kind === "listen") && !voice.on) { warn(`"${item.name}" needs "voice": true in app`); return; }
   const payload = actionOf(item, query);
@@ -741,6 +959,7 @@ function wireInput() {
     if (e.key === "Escape") {
       if (isOpen()) {
         if (filterText) setFilter("");
+        else if (search.mode === "ask") clearAnswer();
         else if (clipMode()) closeClipboard();
         else if (inFolder()) closeFolder();
         else closeDeck();
@@ -755,6 +974,17 @@ function wireInput() {
     const plain = !e.ctrlKey && !e.altKey && !e.metaKey;
     // Results mode: arrows pick a row, Enter opens it, Shift+Enter = alternate.
     if (search.mode) {
+      if (search.mode === "ask") {
+        if (e.key === "Enter") {
+          const q = filterText.replace(/^\?\s*/, "");
+          if (q.trim()) { setFilter(""); ask(q); } // ask() shows "thinking…" after the line is cleared
+          e.preventDefault(); return;
+        }
+        if (e.key === "Backspace") { if (!filterText) clearAnswer(); else setFilter(filterText.slice(0, -1)); e.preventDefault(); return; }
+        // Typing after an answer continues the conversation (history is kept until the deck closes).
+        if (e.key.length === 1 && plain) { setFilter((filterText ? "" : "? ") + filterText + e.key); e.preventDefault(); }
+        return;
+      }
       if (e.key === "ArrowDown" || e.key === "ArrowUp") { moveSel(e.key === "ArrowDown" ? 1 : -1); e.preventDefault(); return; }
       if (e.key === "Enter") { pickRow(search.sel, e.shiftKey); e.preventDefault(); return; }
       if (e.key === "Backspace") {
@@ -782,7 +1012,12 @@ function wireInput() {
     if (e.key === "Enter") {
       if (currentAnswer != null) { copyAnswer(); e.preventDefault(); return; }
       if (currentQuicklink) { fire(currentQuicklink.item, currentQuicklink.query); e.preventDefault(); return; }
-      if (filterText) { const t = visibleTiles()[0]; if (t) fireEl(t, e.shiftKey); e.preventDefault(); return; }
+      if (filterText) {
+        const t = visibleTiles()[0];
+        if (t) fireEl(t, e.shiftKey);
+        else if (ai.enabled) { const q = filterText; setFilter(""); ask(q); } // no tile matched → ask Fay
+        e.preventDefault(); return;
+      }
       if (e.shiftKey && document.activeElement && document.activeElement._item) { fireEl(document.activeElement, true); e.preventDefault(); }
       return; // no filter: native Enter on a focused tile
     }
@@ -826,7 +1061,7 @@ async function loadConfig() {
     try { text = await invoke("load_config"); } catch (e) { warn(`config read failed: ${e}`); }
     if (text) {
       try {
-        return { cfg: JSON.parse(text), seeded: false };
+        return { cfg: JSON.parse(text), raw: JSON.parse(text), seeded: false };
       } catch (e) {
         // Never touch the user's file; run on the bundled default so Fay stays usable.
         const where = jsonErrorWhere(text, e);
@@ -837,7 +1072,7 @@ async function loadConfig() {
     const txt = await bundled();
     try {
       const path = await invoke("save_config", { text: txt });
-      return { cfg: JSON.parse(txt), seeded: true, path };
+      return { cfg: JSON.parse(txt), raw: JSON.parse(txt), seeded: true, path };
     } catch (e) {
       warn(`could not create user config: ${e}`);
       return { cfg: JSON.parse(txt), seeded: false };
@@ -876,7 +1111,7 @@ async function loadPacks() {
 }
 function applyPacks(cfg, packs) {
   if (!Array.isArray(cfg.packs)) return;
-  const have = new Set([...(cfg.scenes || []), ...(cfg.apps || []), ...(cfg.system || [])].map((t) => t && t.id));
+  const have = new Set(allTiles(cfg).map((t) => t.id));
   for (const name of cfg.packs) {
     const pk = packs[name];
     if (!pk || !Array.isArray(pk.tiles)) continue;
@@ -905,6 +1140,7 @@ function validateConfig(cfg, packs) {
     if (k === "focus" && !(t.minutes > 0) && t.action !== "stop") p.push(`${who} needs "minutes": 25 (or "action": "stop")`);
     if (k === "clipboard" && isStep) p.push(`${who}: a step can't open the clipboard`);
     if (k === "say" && typeof t.text !== "string") p.push(`${who} needs "text" to say`);
+    if ((k === "ask" || k === "add") && isStep) p.push(`${who}: a step can't be "${k}"`);
     if (t.say != null && typeof t.say !== "string") p.push(`${who}: "say" must be a string`);
     if (k === "multi") {
       if (!t.actions.length) p.push(`${who}: "actions" is empty`);
@@ -988,7 +1224,8 @@ async function main() {
   wireInput();
   let showNow = false;
   try {
-    const [{ cfg, seeded, path, broken }, packs] = await Promise.all([loadConfig(), loadPacks()]);
+    const [{ cfg, raw, seeded, path, broken }, packs] = await Promise.all([loadConfig(), loadPacks()]);
+    ai.raw = raw && !broken ? raw : null; // the untouched user config (for "+ Add app")
     const problems = validateConfig(cfg, packs);
     applyPacks(cfg, packs);
     await applyCommandsFolder(cfg);
@@ -1029,6 +1266,9 @@ async function main() {
 
     (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
     (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
+    if (app.addTile !== false && ai.raw) {
+      els.apps.appendChild(tile({ id: "_add", name: "Add app", glyph: "+", kind: "add", hint: "browse for an exe / shortcut" }, "app"));
+    }
     (cfg.system || []).forEach((a) => els.system.appendChild(tile(a, "system")));
     renumber();
     refreshRunning();
@@ -1053,6 +1293,7 @@ async function main() {
     }
 
     startVoice(app, cfg);
+    startAi(app, cfg);
 
     if (problems.length) {
       warn(`config: ${problems.slice(0, 2).join(" · ")}${problems.length > 2 ? ` (+${problems.length - 2} more)` : ""}`);

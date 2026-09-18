@@ -157,6 +157,11 @@ body.results .groups, body.results .group--folder { display: none; }
 .row__text { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row__sub { font-size: 9.5px; color: var(--dim); max-width: 46%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row--empty { display: block; color: var(--dim); font-size: 11px; cursor: default; }
+.row--answer { display: block; cursor: default; padding: 14px 18px; }
+.answer__text { font-size: 13px; line-height: 1.55; white-space: pre-wrap; color: var(--txt); }
+.answer__meta { margin-top: 8px; font-size: 9.5px; letter-spacing: 0.12em; color: var(--dim); }
+.tile--k-add { border-style: dashed; opacity: 0.75; }
+.tile--k-add:hover { opacity: 1; }
 
 /* scene teardown: × appears on hover for tiles with `closes` */
 .tile__close {
