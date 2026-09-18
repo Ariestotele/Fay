@@ -3,10 +3,11 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** Phases 1–14 merged to `main` (all CI-green). **v0.1.0 is
-published on the Releases page** (`Fay_0.1.0_x64-setup.exe`). Phase 15 (README)
-in PR; Phase 16 (Ctrl+Mouse5) code written, next PR. Owner has not yet
-runtime-tested — install v0.1.0 (or any newer CI artifact) and report.
+**Current phase:** **Phases 1–16 merged to `main`, all CI-green. Build-day queue
+complete.** v0.1.0 is published on the Releases page
+(`Fay_0.1.0_x64-setup.exe`); every later push to `main` also uploads a fresh
+installer artifact. Owner has not yet runtime-tested — that is the next thing
+that matters. Next features are the owner's pick (see Pipeline).
 
 ## ✅ Done (all merged)
 
@@ -28,8 +29,8 @@ runtime-tested — install v0.1.0 (or any newer CI artifact) and report.
 | 13 | Running-app indicator — `list_running` + per-tile process-name guess (`process` override); glowing dot; polled only while open (in PR) |
 | 14 | Per-machine profiles — `machines.<HOST>.tiles.<id>` overlay merged onto tiles; `get_hostname`; host shown in footer (next PR) |
 | — | **Debug round** — no console flashes (`CREATE_NO_WINDOW`), blocking commands made `async` (no UI freeze), Heart idle while hidden, HiDPI-crisp canvas, no runaway polling, broken-config fallback (in PR) |
-| 15 | README rewritten as the product front door — preview, 30-second install, feature table, full config reference (in PR) |
-| 16 | Ctrl+Mouse5 summon — `app.mouseSummon`, WH_MOUSE_LL hook thread (`windows-sys`), swallows the click; `set_mouse_summon` (next PR) |
+| 15 | README rewritten as the product front door — preview, 30-second install, feature table, full config reference |
+| 16 | Ctrl+Mouse5 summon — `app.mouseSummon`, WH_MOUSE_LL hook thread (`windows-sys`), swallows the click; `set_mouse_summon` |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
