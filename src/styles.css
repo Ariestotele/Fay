@@ -125,6 +125,7 @@ body.open .clock { opacity: 0; }
   pointer-events: none;
 }
 #status.is-flash { color: var(--accent); }
+#status.is-warn { color: #ffcf6b; }
 
 @media (prefers-reduced-motion: reduce) {
   .deck { transition: none; }

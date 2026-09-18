@@ -6,7 +6,8 @@
     "hotkey": "Ctrl+Alt+Space",
     "autostart": false,
     "accent": "auto",
-    "backdrop": 0.62
+    "backdrop": 0.62,
+    "startHidden": true
   },
   "scenes": [
     {

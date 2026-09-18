@@ -12,6 +12,27 @@ Every push to `main` builds a Windows installer automatically:
 That's it — no Rust or Node needed. Use the sections below only if you want to
 develop or run from source.
 
+## Where your config lives (installed build)
+
+The installer bakes a **default** `apps.config.json` into the app. On first run
+Fay copies it to a **user-editable** file and loads from there from then on:
+
+```
+%APPDATA%\com.fay.hub\apps.config.json
+```
+
+- **Tray › Open config file** opens it in Notepad. Edit, save.
+- **Tray › Reload config** applies your changes (no restart, no rebuild).
+- Delete the file to reset to the bundled default on next launch.
+
+Fay **starts hidden** in the tray (so autostart doesn't cover your screen at
+login) — summon it with **Ctrl+Alt+Space**. It shows itself on the very first
+run so you know it's there. Set `"startHidden": false` in the config to always
+open on launch.
+
+Problems (a hotkey that failed to bind, a missing SoundVolumeView, a config
+typo) show in amber in the footer instead of failing silently.
+
 ## Prerequisites (Windows)
 
 1. **PowerToys** — install from the Microsoft Store or

@@ -262,6 +262,66 @@ fn get_accent_color() -> Result<String, String> {
     }
 }
 
+/// The user-editable config lives in the app config dir (e.g.
+/// `%APPDATA%\com.fay.hub\apps.config.json`), seeded from the bundled default on
+/// first run — so the installed build can be customized without rebuilding.
+fn config_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join("apps.config.json"))
+}
+
+/// Read the user config. `None` means it doesn't exist yet (the frontend seeds it).
+#[tauri::command]
+fn load_config(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let p = config_path(&app)?;
+    match std::fs::read_to_string(&p) {
+        Ok(s) => Ok(Some(s)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("{}: {e}", p.display())),
+    }
+}
+
+/// Write the user config (used to seed it on first run). Returns the path.
+#[tauri::command]
+fn save_config(app: tauri::AppHandle, text: String) -> Result<String, String> {
+    let p = config_path(&app)?;
+    if let Some(dir) = p.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&p, text).map_err(|e| format!("{}: {e}", p.display()))?;
+    Ok(p.display().to_string())
+}
+
+#[tauri::command]
+fn config_file_path(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(config_path(&app)?.display().to_string())
+}
+
+/// Open the user config in Notepad (always editable, unlike the .json default
+/// handler which is often a browser).
+fn open_config_in_editor(app: &tauri::AppHandle) {
+    if let Ok(p) = config_path(app) {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("notepad").arg(&p).spawn();
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = p;
+        }
+    }
+}
+
+/// Show the window (used when the config says not to start hidden, or on first run).
+#[tauri::command]
+fn show_window(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        fill_active_monitor(&w);
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(HotkeyState::default())
@@ -308,7 +368,11 @@ fn main() {
             set_summon_hotkey,
             register_item_hotkeys,
             set_autostart,
-            get_accent_color
+            get_accent_color,
+            load_config,
+            save_config,
+            config_file_path,
+            show_window
         ])
         .setup(|app| {
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
@@ -325,8 +389,10 @@ fn main() {
 
             // System tray.
             let show_i = MenuItem::with_id(app, "show", "Show / Hide Fay", true, None::<&str>)?;
+            let config_i = MenuItem::with_id(app, "config", "Open config file", true, None::<&str>)?;
+            let reload_i = MenuItem::with_id(app, "reload", "Reload config", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit Fay", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_i, &config_i, &reload_i, &quit_i])?;
 
             let _tray = TrayIconBuilder::with_id("fay-tray")
                 .tooltip("Fay — command deck")
@@ -336,6 +402,12 @@ fn main() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {
                             toggle_window(&w);
+                        }
+                    }
+                    "config" => open_config_in_editor(app),
+                    "reload" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.eval("location.reload()");
                         }
                     }
                     "quit" => app.exit(0),

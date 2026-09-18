@@ -145,3 +145,18 @@ changing the summon combo no longer wipes item hotkeys (the old
 pressed shortcut against the bindings first and falls back to toggling the
 window. Conflicting combos are skipped, unparseable ones reported. Default:
 scenes on `Ctrl+Alt+1/2/3`.
+
+### 2026-09-18 — Phase 9: installed-build readiness
+Three fixes so the installer build is actually usable day-to-day:
+1. **Editable config.** The installer bakes `src/apps.config.json` into the exe,
+   which froze the deck — the opposite of "routine changes are JSON edits". On
+   first run the bundled default is seeded to `%APPDATA%\com.fay.hub\apps.config.json`
+   (`load_config`/`save_config`) and loaded from there; tray gets *Open config
+   file* (Notepad, always editable) and *Reload config* (`location.reload()`).
+   Supersedes the earlier "config lives in src/" reasoning for installed builds.
+2. **Start hidden.** Window is `visible: false`; the frontend shows it on first
+   run or when `app.startHidden` is `false`. Avoids a full-screen overlay at
+   login with autostart.
+3. **Visible failures.** A `warn()` status (amber, 7s) in the footer surfaces
+   hotkey-bind failures, missing SoundVolumeView, config typos, etc. On a config
+   error the window is shown so the message can be seen.

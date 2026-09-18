@@ -1,5 +1,5 @@
 // Fay — config-driven hub logic. Rendering of the Heart lives in heart.js.
-// The UI is rendered entirely from apps.config.json. Never hardcode tiles here.
+// The UI is rendered entirely from the config. Never hardcode tiles here.
 
 const els = {
   scenes: document.getElementById("scenes"),
@@ -21,10 +21,24 @@ function openDeck() { document.body.classList.add("open"); }
 function closeDeck() { document.body.classList.remove("open"); }
 function isOpen() { return document.body.classList.contains("open"); }
 
+// ---- status line (the footer) ---------------------------------------------
+// flash = transient info; warn = a problem the user should actually see.
+function setStatus(msg, cls, ms) {
+  els.status.textContent = msg;
+  els.status.className = cls || "";
+  clearTimeout(setStatus._t);
+  setStatus._t = setTimeout(() => {
+    els.status.textContent = "ready";
+    els.status.className = "";
+  }, ms);
+}
+const flash = (m) => setStatus(m, "is-flash", 1600);
+const warn = (m) => { console.warn(m); setStatus(m, "is-warn", 7000); };
+
 // ---- launching ------------------------------------------------------------
 async function launch(item) {
   if (item.audioOut && invoke) {
-    invoke("set_audio_output", { device: item.audioOut }).catch((e) => flash(`✕ audio: ${e}`));
+    invoke("set_audio_output", { device: item.audioOut }).catch((e) => warn(`audio: ${e}`));
   }
   if (!item.target) return;
   flash(`→ ${item.name}${item.elevated ? " (admin)" : ""}`);
@@ -32,22 +46,12 @@ async function launch(item) {
     try {
       await invoke("launch", { target: item.target, elevated: !!item.elevated });
     } catch (e) {
-      flash(`✕ ${item.name}: ${e}`);
+      warn(`${item.name}: ${e}`);
     }
   } else {
     console.log("[preview] would launch:", item.target);
     flash(`(preview) ${item.name}`);
   }
-}
-
-function flash(msg) {
-  els.status.textContent = msg;
-  els.status.classList.add("is-flash");
-  clearTimeout(flash._t);
-  flash._t = setTimeout(() => {
-    els.status.textContent = "ready";
-    els.status.classList.remove("is-flash");
-  }, 1600);
 }
 
 function tile(item, kind) {
@@ -133,17 +137,37 @@ function wireInput() {
   });
 }
 
+// ---- config ---------------------------------------------------------------
+// Installed builds load the user's editable copy (app config dir), seeded from
+// the bundled default on first run. Browser preview just uses the bundled file.
 async function loadConfig() {
-  const res = await fetch("apps.config.json", { cache: "no-store" });
-  if (!res.ok) throw new Error(`config ${res.status}`);
-  return res.json();
+  const bundled = async () => {
+    const r = await fetch("apps.config.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(`bundled config ${r.status}`);
+    return r.text();
+  };
+  if (invoke) {
+    let text = null;
+    try { text = await invoke("load_config"); } catch (e) { warn(`config read failed: ${e}`); }
+    if (text) return { cfg: JSON.parse(text), seeded: false };
+    const txt = await bundled();
+    try {
+      const path = await invoke("save_config", { text: txt });
+      return { cfg: JSON.parse(txt), seeded: true, path };
+    } catch (e) {
+      warn(`could not create user config: ${e}`);
+      return { cfg: JSON.parse(txt), seeded: false };
+    }
+  }
+  return { cfg: JSON.parse(await bundled()), seeded: false };
 }
 
 async function main() {
   startClock();
   wireInput();
+  let showNow = false;
   try {
-    const cfg = await loadConfig();
+    const { cfg, seeded, path } = await loadConfig();
     const app = cfg.app || {};
     if (app.name) els.brand.textContent = app.name.toUpperCase();
 
@@ -154,10 +178,10 @@ async function main() {
     applyAccent(window.__fayAccent);
 
     if (app.hotkey && invoke) {
-      invoke("set_summon_hotkey", { accelerator: app.hotkey }).catch((e) => console.error("hotkey:", e));
+      invoke("set_summon_hotkey", { accelerator: app.hotkey }).catch((e) => warn(`summon hotkey: ${e}`));
     }
     if (typeof app.autostart === "boolean" && invoke) {
-      invoke("set_autostart", { enabled: app.autostart }).catch((e) => console.error("autostart:", e));
+      invoke("set_autostart", { enabled: app.autostart }).catch((e) => warn(`autostart: ${e}`));
     }
 
     (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
@@ -174,13 +198,18 @@ async function main() {
       }));
     if (bindings.length && invoke) {
       invoke("register_item_hotkeys", { bindings })
-        .then((bad) => { if (bad && bad.length) console.warn("unparseable hotkeys:", bad); })
-        .catch((e) => console.error("item hotkeys:", e));
+        .then((bad) => { if (bad && bad.length) warn(`hotkeys not bound: ${bad.join(", ")}`); })
+        .catch((e) => warn(`item hotkeys: ${e}`));
     }
+
+    if (seeded) setStatus(`config created — edit it via tray › Open config file`, "is-flash", 8000);
+    // Start hidden by default (tray + hotkey); show on first run or if configured.
+    showNow = seeded || app.startHidden === false;
   } catch (e) {
-    flash(`config error: ${e.message}`);
-    console.error(e);
+    warn(`config error: ${e.message}`);
+    showNow = true; // make the problem visible
   }
+  if (showNow && invoke) invoke("show_window").catch(() => {});
   refreshMonitors();
 }
 
