@@ -2,6 +2,7 @@
 // (with live stats + a focus arc) and with the deck open. Needs playwright-core
 // (npm i playwright-core) and a Chromium binary (CHROME env var or the default).
 // Run: node docs/render-preview.js
+const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright-core");
