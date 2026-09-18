@@ -387,3 +387,15 @@ to two lines (full on hover), the deck scrolls within the viewport, and
 groups whose tiles are all filtered out hide their label. `docs/ui-preview.png`
 is now the real render, not a mockup. Lesson recorded: a screenshot of the
 real frontend is cheap here and should be part of every UI-touching PR.
+
+### 2026-09-18 — Phase 24: Heart polish, chosen from rendered variants
+The owner picked between two real renders (A = as merged, B = polished) and
+took B plus the two extras offered. B adds a soft radial halo under the main
+and inner bands (volume without any solid line — the "bubble" the owner asked
+for originally), sharpens band cores with a `close^1.6` falloff so rings look
+denser at the same particle count, and quiets the deck tiles (20 % accent
+border, darker glass) so the Heart reads through them. The extras: a bloom
+and brighter inner particles give the sphere a core so it reads as the
+button, the clock sits in the sphere's lower rim, and the wordmark drops to
+half opacity. Process decision reaffirmed: design choices are made on
+rendered screenshots of the real frontend, one render per tweak.

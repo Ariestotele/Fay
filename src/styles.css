@@ -32,7 +32,7 @@ body { background: rgba(4, 8, 10, var(--backdrop-alpha)); }
   transform: translateX(-50%);
   font-size: 18px;
   letter-spacing: 0.7em;
-  opacity: 0.85;
+  opacity: 0.5;
   text-shadow: 0 0 18px var(--accent);
 }
 
@@ -51,9 +51,9 @@ body { background: rgba(4, 8, 10, var(--backdrop-alpha)); }
 
 .clock {
   position: absolute;
-  top: calc(50% + 130px); left: 50%;
+  top: calc(50% + 78px); left: 50%;
   transform: translateX(-50%);
-  font-size: 13px;
+  font-size: 12px;
   letter-spacing: 0.3em;
   color: var(--accent);
   opacity: 0.8;
@@ -104,8 +104,8 @@ body.in-folder .group--folder { display: flex; }
   position: relative;
   width: 152px; min-height: 58px;
   padding: 12px 14px; border-radius: 16px;
-  background: rgba(3, 16, 13, 0.5);
-  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: rgba(3, 12, 14, 0.58);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   cursor: pointer;
   display: flex; flex-direction: column; gap: 6px;
