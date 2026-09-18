@@ -227,3 +227,10 @@ blur returns the deck to rest and the poll is gated on focus; (6) a syntax error
 in the user config emptied the deck — it now falls back to the bundled default
 without touching the user's file and shows the window with the warning;
 (7) hotkey badge overlapped long hints.
+
+### 2026-09-18 — Phase 15: README as the front door
+README rewritten as the product page: Heart preview up top, 30-second install
+from the Releases page (no toolchain), a feature table, the config with a
+complete key reference, scenes in three steps, and pointers into `docs/`. The
+deep material stays in SETUP/ARCHITECTURE/DECISIONS/STATE; the README only has
+to get someone from "what is this" to "it's running" fast.

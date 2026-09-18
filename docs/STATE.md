@@ -27,7 +27,8 @@ progress (see Pipeline).
 | 12 | Real app icons — `get_app_icon` extracts + caches each target's icon; glyph fallback; `icon` override (in PR) |
 | 13 | Running-app indicator — `list_running` + per-tile process-name guess (`process` override); glowing dot; polled only while open (in PR) |
 | 14 | Per-machine profiles — `machines.<HOST>.tiles.<id>` overlay merged onto tiles; `get_hostname`; host shown in footer (next PR) |
-| — | **Debug round** — no console flashes (`CREATE_NO_WINDOW`), blocking commands made `async` (no UI freeze), Heart idle while hidden, HiDPI-crisp canvas, no runaway polling, broken-config fallback (next PR) |
+| — | **Debug round** — no console flashes (`CREATE_NO_WINDOW`), blocking commands made `async` (no UI freeze), Heart idle while hidden, HiDPI-crisp canvas, no runaway polling, broken-config fallback (in PR) |
+| 15 | README rewritten as the product front door — preview, 30-second install, feature table, full config reference (next PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -53,7 +54,7 @@ progress (see Pipeline).
 
 | Feature | Value | Notes |
 | :-- | :-- | :-- |
-| README + polish pass | med | proper README with the Heart preview, config reference — **next** |
+| Ctrl+Mouse5 summon | med | native low-level mouse hook — **next**, last in the queue; owner tests via installer |
 | Per-machine profiles | med | different paths per PC; fixes absolute-path portability |
 | Running-app indicator | med | dot on apps already open |
 | First-run path picker | med | "browse…" to capture exe paths |
