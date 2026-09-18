@@ -44,5 +44,6 @@
     { "id": "phone",   "name": "Phone Link",   "glyph": "☏", "target": "ms-phone:" },
     { "id": "steam",   "name": "Steam",        "glyph": "▸", "target": "steam://open/main" },
     { "id": "taskmgr", "name": "Task Manager", "glyph": "▦", "target": "taskmgr", "hint": "Add \"elevated\": true if you want it to start as admin" }
-  ]
+  ],
+  "machines": {}
 }

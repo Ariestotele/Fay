@@ -39,6 +39,20 @@ struct Hotkeys {
 }
 type HotkeyState = std::sync::Mutex<Hotkeys>;
 
+/// Build a child-process command that never flashes a console window. Fay is a
+/// GUI app; without CREATE_NO_WINDOW every `cmd`/`powershell` call would pop a
+/// black console for a moment.
+#[allow(unused_mut)]
+fn cmd(program: &str) -> std::process::Command {
+    let mut c = std::process::Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    c
+}
+
 /// Resize/move the window to fill the monitor it's currently on (HUD overlay).
 fn fill_active_monitor(window: &WebviewWindow) {
     if let Ok(Some(m)) = window.current_monitor() {
@@ -72,7 +86,7 @@ fn do_launch(target: &str, elevated: bool) -> Result<(), String> {
         if elevated {
             // Single-quote escaping for PowerShell ('' is a literal quote).
             let safe = target.replace('\'', "''");
-            std::process::Command::new("powershell")
+            cmd("powershell")
                 .args([
                     "-NoProfile",
                     "-WindowStyle",
@@ -83,7 +97,7 @@ fn do_launch(target: &str, elevated: bool) -> Result<(), String> {
                 .spawn()
                 .map_err(|e| e.to_string())?;
         } else {
-            std::process::Command::new("cmd")
+            cmd("cmd")
                 .args(["/C", "start", "", target])
                 .spawn()
                 .map_err(|e| e.to_string())?;
@@ -149,7 +163,7 @@ fn do_set_audio_output(device: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         for role in ["0", "1"] {
-            let status = std::process::Command::new("SoundVolumeView.exe")
+            let status = cmd("SoundVolumeView.exe")
                 .args(["/SetDefault", device, role])
                 .status()
                 .map_err(|e| format!("SoundVolumeView.exe not found: {e}"))?;
@@ -166,8 +180,10 @@ fn do_set_audio_output(device: &str) -> Result<(), String> {
     }
 }
 
+// The commands below shell out and block; they are `async` so Tauri runs them
+// off the main thread instead of freezing the UI/animation.
 #[tauri::command]
-fn set_audio_output(device: String) -> Result<(), String> {
+async fn set_audio_output(device: String) -> Result<(), String> {
     do_set_audio_output(&device)
 }
 
@@ -241,11 +257,11 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
 
 /// Read the Windows accent color as `#rrggbb` so the UI can match the system theme.
 #[tauri::command]
-fn get_accent_color() -> Result<String, String> {
+async fn get_accent_color() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         let ps = r#"$c=(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\DWM' -Name AccentColor -ErrorAction Stop).AccentColor; '#{0:x2}{1:x2}{2:x2}' -f ($c -band 255),(($c -shr 8) -band 255),(($c -shr 16) -band 255)"#;
-        let out = std::process::Command::new("powershell")
+        let out = cmd("powershell")
             .args(["-NoProfile", "-Command", ps])
             .output()
             .map_err(|e| e.to_string())?;
@@ -329,7 +345,7 @@ fn show_window(app: tauri::AppHandle) {
 /// targets (`steam://`, `ms-phone:`) have no icon and return Err so the UI
 /// keeps the glyph. Results are cached as PNG files in the app cache dir.
 #[tauri::command]
-fn get_app_icon(app: tauri::AppHandle, target: String) -> Result<String, String> {
+async fn get_app_icon(app: tauri::AppHandle, target: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         // cache key: a cheap stable hash of the target string
@@ -362,7 +378,7 @@ $bmp=$ico.ToBitmap(); $ms=New-Object IO.MemoryStream
 $bmp.Save($ms,[System.Drawing.Imaging.ImageFormat]::Png)
 [Convert]::ToBase64String($ms.ToArray())"#
         );
-        let out = std::process::Command::new("powershell")
+        let out = cmd("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
             .output()
             .map_err(|e| e.to_string())?;
@@ -438,10 +454,10 @@ fn b64_decode(s: &str) -> Result<Vec<u8>, ()> {
 /// Names of running processes (lowercase, no extension) so the UI can mark
 /// tiles whose app is already open.
 #[tauri::command]
-fn list_running() -> Result<Vec<String>, String> {
+async fn list_running() -> Result<Vec<String>, String> {
     #[cfg(target_os = "windows")]
     {
-        let out = std::process::Command::new("powershell")
+        let out = cmd("powershell")
             .args([
                 "-NoProfile",
                 "-NonInteractive",
@@ -461,6 +477,16 @@ fn list_running() -> Result<Vec<String>, String> {
     {
         Ok(Vec::new())
     }
+}
+
+/// Machine name (uppercase) for per-machine config profiles (`machines` block).
+#[tauri::command]
+fn get_hostname() -> String {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_default()
+        .trim()
+        .to_uppercase()
 }
 
 fn main() {
@@ -484,10 +510,13 @@ fn main() {
                         })
                     };
                     if let Some(b) = binding {
-                        if let Some(dev) = &b.audio_out {
-                            let _ = do_set_audio_output(dev);
-                        }
-                        let _ = do_launch(&b.target, b.elevated);
+                        // Off the event loop: the audio switch blocks for a moment.
+                        std::thread::spawn(move || {
+                            if let Some(dev) = &b.audio_out {
+                                let _ = do_set_audio_output(dev);
+                            }
+                            let _ = do_launch(&b.target, b.elevated);
+                        });
                         return;
                     }
                     // Otherwise it's the summon combo.
@@ -515,7 +544,8 @@ fn main() {
             config_file_path,
             show_window,
             get_app_icon,
-            list_running
+            list_running,
+            get_hostname
         ])
         .setup(|app| {
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).

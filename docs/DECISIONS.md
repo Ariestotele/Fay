@@ -203,3 +203,27 @@ and asks `gh release view v<version>`; if absent, the `release` job builds the
 installer and publishes the release, creating the tag itself
 (`softprops/action-gh-release` with `tag_name` + `target_commitish`). Shipping is
 therefore "bump the version, merge to main". Supersedes the tag-trigger entry.
+
+### 2026-09-18 — Phase 14: per-machine profiles
+Absolute paths differ per PC, so the config gains a `machines` block keyed by
+computer name (`get_hostname` → `COMPUTERNAME`, uppercase; matched
+case-insensitively). `machines.<name>.tiles.<id>` is shallow-merged onto the
+tile with that id before rendering, hotkey registration, etc. Any field can be
+overridden. The host name is shown in the footer so it's obvious which profile
+applies. Kept as an overlay rather than separate config files so the deck stays
+one document.
+
+### 2026-09-18 — Debug round (static review, all phases)
+Fixed before anyone ran the app: (1) every `cmd`/`powershell` child flashed a
+console window — all child processes now go through a `cmd()` helper that sets
+`CREATE_NO_WINDOW`; (2) Tauri runs sync commands on the main thread, so icon
+extraction, the running-process check, the accent read and the audio switch
+froze the Heart — those commands are now `async`, and hotkey-fired scene
+actions run on a thread; (3) the Heart animated while the window was hidden at
+startup — it now starts only when the window has focus; (4) the canvas ignored
+`devicePixelRatio` (blurry on HiDPI) — it renders at device resolution;
+(5) if the window hid while the deck was open, the 5s process poll ran forever —
+blur returns the deck to rest and the poll is gated on focus; (6) a syntax error
+in the user config emptied the deck — it now falls back to the bundled default
+without touching the user's file and shows the window with the warning;
+(7) hotkey badge overlapped long hints.
