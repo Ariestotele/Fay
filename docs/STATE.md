@@ -53,19 +53,54 @@ that matters. Next features are the owner's pick (see Pipeline).
 - [ ] Runtime checks: tray appears, Ctrl+Alt+Space toggles, a UAC tile prompts,
       footer shows real monitor count, accent matches Windows.
 
-## 🚀 Pipeline — buildable next (owner picks order)
+## 🚀 Pipeline — candidate features (owner picks; nothing here is started)
 
-| Feature | Value | Notes |
-| :-- | :-- | :-- |
-| *(build-day queue complete after Phase 16)* | | Next candidates, owner's pick: search + categories (deck > ~20 tiles), config validation with line numbers, cursor-monitor summon (show on the monitor under the cursor), code signing to silence SmartScreen |
-| Per-machine profiles | med | different paths per PC; fixes absolute-path portability |
-| Running-app indicator | med | dot on apps already open |
-| First-run path picker | med | "browse…" to capture exe paths |
+Researched 2026-09-18 from Raycast / Flow Launcher / PowerToys Command Palette /
+Keypirinha / Listary / ueli / Wox, Stream Deck-style macro software, and the
+"AI Jarvis" launcher wave (Raycast AI, Open.Jarvis, Cluely/Highlight). Effort:
+S = frontend/config only, M = a Rust command or two, L = new subsystem.
+
+### AI — "talk to Fay" (the viral category)
+
+| # | Feature | What it feels like | How | Effort |
+| :-- | :-- | :-- | :-- | :-- |
+| A | **Natural-language bar** | Type *"game mode but keep audio on speakers"* → the right tiles fire with overrides. | Tile list sent as tools to an LLM (Claude API key from config, or local Ollama); model returns tiles/commands to run. | M |
+| B | **Push-to-talk voice** | Hold a key/Mouse5, say *"start focus"* → Heart pulses while listening → scene fires. | Windows built-in `System.Speech` recognition via PowerShell (offline), grammar built from tile names. Upgrade path: Whisper. | M |
+| C | **Spoken replies + Heart reacts** | *"Game mode ready — audio on headset."* Sphere swells while it speaks. | Windows TTS (`System.Speech`) + `Heart.pulse()` hook. | S |
+| D | **Screen-aware ask** | Summon → *"what's this error?"* → reads the focused window. | Screenshot active window → vision model. Opt-in, explicit hotkey, never always-on. | M |
+| E | **Agentic tasks** | One request → multi-step plan with retries. | Built on A; let the model chain tools. After A is solid. | M–L |
+
+### Classic launcher features
+
+| # | Feature | What it feels like | How | Effort |
+| :-- | :-- | :-- | :-- | :-- |
+| 1 | **System-command tiles** | Sleep, Lock, Restart, Shutdown, Empty Recycle Bin, Toggle dark mode as tiles. | `kind: "system"` + fixed command table in Rust. | S |
+| 2 | **Quicklinks with `{query}`** | Type `yt lofi` → opens YouTube search. | Tile `target` with `{query}` placeholder; filter bar passes the rest. | S |
+| 3 | **Inline calculator** | Type `1440*0.62` → answer in the footer, Enter copies. | Safe expression evaluator in JS. | S |
+| 4 | **Multi-action / macro tiles** | One tile runs a sequence: audio → app → app → wait → app (Stream Deck "Multi-Action"). | `actions: [...]` array per tile, run in order with optional delays. | M |
+| 5 | **Scene close / teardown** | Second press of an active scene closes its apps. | `closes: ["discord","zen"]` → `taskkill` by process name. | M |
+| 6 | **Folders / pages** | Tile opens a sub-deck (Games, Work, Tools) — Stream Deck nested folders, keeps the deck ≤ 9 keys. | `children: [...]` tiles; back = Esc. Replaces "search + categories". | M |
+| 7 | **Clipboard history** | `Ctrl+Alt+V` style list of last N copies, Enter pastes. | Poll clipboard in Rust; stored in memory only. | M |
+| 8 | **Snippets** | Tile pastes a saved text (email, address, prompt). | `kind: "snippet"`; set clipboard + send Ctrl+V. | S |
+| 9 | **Everything file search** | Type `>report` → results from voidtools Everything. | Shell out to `es.exe` if present. | M |
+| 10 | **Windows Settings pack** | Tiles for Bluetooth, Sound, Display, Network, Update via `ms-settings:` URIs. | Config-only preset, opt-in block. | S |
+| 11 | **Command folder** | Drop `.ps1` / `.bat` files in a folder → they become tiles. | Scan a config folder on load. | S |
+| 12 | **Media controls** | Play/pause, next, mute, volume as tiles or keys. | Send media virtual keys via `SendInput`. | S |
+| 13 | **Live stats in the Heart** | CPU / GPU / RAM / net readouts orbiting the rings. | Poll counters (PowerShell / `sysinfo` crate) only while shown. | M |
+| 14 | **Focus timer** | Pomodoro on the Heart; ring fills as time passes. | Frontend timer + optional TTS ping. | S |
+| 15 | **Browser bookmarks search** | Type a bookmark name → opens in Zen. | Read the browser's bookmarks JSON. | M |
+| 16 | **Unit / currency conversion** | `12 usd to eur`, `5 mi to km`. | Extends the calculator; currency needs a fetch. | S |
+| 17 | **Config validation** | Broken config → footer says *line 23: missing comma*. | JSON parse with position → line/col. | S |
+| 18 | **Cursor-monitor summon** | Fay appears on the monitor under the mouse. | Use cursor position in `fill_active_monitor`. | S |
+| 19 | **First-run path picker** | "Browse…" to capture an exe path into the config. | Tauri dialog plugin. | M |
+| 20 | **Code signing** | No SmartScreen warning. | Needs a certificate (cost) — owner decision. | — |
+
+**Skip (out of scope / not worth it):** full file indexing, plugin SDK,
+window snapping (PowerToys does it), always-on screen capture (Cluely-style).
 
 ## 🧭 Later / parked
 
-- **Ctrl+Mouse5 summon** — needs a low-level Windows mouse hook (WH_MOUSE_LL);
-  keyboard-only plugin can't do it. Build when the owner can test interactively.
-- Search + categories once the deck exceeds ~20 tiles.
 - Repo default branch is still `claude/charming-ramanujan-shirak`; consider
   switching it to `main` in GitHub settings.
+- Bump `package.json` to 0.2.0 on `main` to publish Phases 14–16 as a Release
+  (currently only CI artifacts).
