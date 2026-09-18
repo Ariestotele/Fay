@@ -10,6 +10,7 @@ const els = {
   clock: document.getElementById("clock"),
   core: document.getElementById("core"),
   canvas: document.getElementById("heart"),
+  filter: document.getElementById("filter"),
 };
 
 const tauri = window.__TAURI__ || null;
@@ -18,8 +19,32 @@ const invoke =
 
 // ---- open / rest state ----------------------------------------------------
 function openDeck() { document.body.classList.add("open"); }
-function closeDeck() { document.body.classList.remove("open"); }
+function closeDeck() { document.body.classList.remove("open"); setFilter(""); }
 function isOpen() { return document.body.classList.contains("open"); }
+
+// ---- type-to-filter + number keys -----------------------------------------
+let filterText = "";
+const visibleTiles = () => [...document.querySelectorAll(".tile:not(.is-hidden)")];
+
+function setFilter(q) {
+  filterText = q;
+  els.filter.textContent = q ? `› ${q}` : "";
+  els.filter.classList.toggle("is-active", !!q);
+  for (const t of document.querySelectorAll(".tile")) {
+    const name = (t.dataset.name || "").toLowerCase();
+    t.classList.toggle("is-hidden", !!q && !name.includes(q));
+  }
+  renumber();
+}
+
+// Label the first nine visible tiles 1–9 so a digit fires them.
+function renumber() {
+  document.querySelectorAll(".tile__idx").forEach((s) => (s.textContent = ""));
+  visibleTiles().slice(0, 9).forEach((t, i) => {
+    const s = t.querySelector(".tile__idx");
+    if (s) s.textContent = String(i + 1);
+  });
+}
 
 // ---- status line (the footer) ---------------------------------------------
 // flash = transient info; warn = a problem the user should actually see.
@@ -57,13 +82,14 @@ async function launch(item) {
 function tile(item, kind) {
   const el = document.createElement("button");
   el.className = `tile tile--${kind}`;
+  el.dataset.name = item.name || "";
   const badge = item.elevated ? `<span class="tile__badge">ADMIN</span>` : "";
   const key = item.hotkey ? `<span class="tile__key">${escapeHtml(item.hotkey)}</span>` : "";
   el.innerHTML = `
     ${badge}${key}
     <span class="tile__glyph">${escapeHtml(item.glyph || "○")}</span>
     <div>
-      <div class="tile__name">${escapeHtml(item.name)}</div>
+      <div class="tile__name"><span class="tile__idx"></span>${escapeHtml(item.name)}</div>
       ${item.hint ? `<div class="tile__hint">${escapeHtml(item.hint)}</div>` : ""}
     </div>`;
   el.addEventListener("click", () => launch(item));
@@ -114,13 +140,33 @@ function wireInput() {
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (isOpen()) closeDeck();
+      if (isOpen()) { if (filterText) setFilter(""); else closeDeck(); }
       else if (invoke) invoke("hide_window");
       return;
     }
-    if (e.key === "Enter" && !isOpen()) { openDeck(); return; }
-    if (isOpen() && e.key.startsWith("Arrow")) {
-      const tiles = [...document.querySelectorAll(".tile")];
+    if (!isOpen()) {
+      if (e.key === "Enter") openDeck();
+      return;
+    }
+    // ---- deck is open ----
+    if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      const t = visibleTiles()[Number(e.key) - 1];
+      if (t) t.click();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === "Backspace") { setFilter(filterText.slice(0, -1)); e.preventDefault(); return; }
+    if (e.key === "Enter") {
+      if (filterText) { const t = visibleTiles()[0]; if (t) t.click(); e.preventDefault(); }
+      return; // no filter: native Enter on a focused tile
+    }
+    if (e.key.length === 1 && /[a-z0-9 \-_.]/i.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      setFilter(filterText + e.key.toLowerCase());
+      e.preventDefault();
+      return;
+    }
+    if (e.key.startsWith("Arrow")) {
+      const tiles = visibleTiles();
       if (!tiles.length) return;
       const cur = tiles.indexOf(document.activeElement);
       let next = cur < 0 ? 0 : cur;
@@ -186,6 +232,7 @@ async function main() {
 
     (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
     (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
+    renumber();
 
     // Direct hotkeys: any tile with a `hotkey` fires without opening Fay.
     const bindings = [...(cfg.scenes || []), ...(cfg.apps || [])]
