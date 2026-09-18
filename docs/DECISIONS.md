@@ -335,3 +335,38 @@ tile (`say`) plus the focus-timer announcement and a spoken "Opening …"
 acknowledgement that `voiceConfirm: false` silences. The Heart wobbles while
 speaking and breathes while listening via `talk()` / `listen()`. Upgrade path
 if wanted later: swap the recognizer for Whisper behind the same protocol.
+
+### 2026-09-18 — Phase 22 (batch 6): AI bar, screen-aware ask, agentic loop, add-app picker
+The model is a **planner, not an executor**: it receives the deck as JSON and
+may only return a bounded vocabulary of action objects (tile ids, close,
+system/media/focus, wait, say, open), which the frontend maps onto the same
+`TileAction` path every click uses — so nothing the model says can reach a
+shell that a config tile couldn't. Destructive actions are gated on the
+user's own last message containing an explicit ask/confirmation, independent
+of what the model claims; the voice grammar likewise omits shutdown-class
+tiles. "Agentic" means the failure of a step is reported back and the model
+may re-plan up to two more times — no open-ended loops. Triggering is
+low-friction: Enter on a line that matches no tile asks the model, `?` asks
+explicitly, and conversation memory lives only while the deck is open.
+Providers: Anthropic (key from the local config or `ANTHROPIC_API_KEY`; the
+bundled default config ships an empty key) or Ollama for fully local use.
+Screen awareness is strictly on demand: the foreground window is captured
+before Fay appears, downscaled, held in memory, attached to one message, and
+never written to disk — an explicit rejection of the always-watching
+overlays. HTTP is `ureq` (blocking, in an async command) rather than reqwest
+to keep the binary small. The add-app picker is a WinForms dialog from STA
+PowerShell (no dialog plugin/capability needed) and writes the user's config
+back re-serialized with 2-space indentation.
+
+### 2026-09-18 — Debug round 2 (after batches 1–6)
+Static review of the whole tree: (1) the ask flow cleared its own "thinking…"
+panel because the filter was reset after the request started — order fixed,
+and typing after an answer now continues the conversation; (2) the Anthropic
+API requires alternating roles starting with `user` — history is normalized
+(neighbouring same-role turns merged, leading assistant turn dropped);
+(3) AI-planned and voice-triggered shutdown/restart bypassed the press-twice
+confirm — now gated (AI) or excluded (voice); (4) pack tiles could collide
+with folder children ids — dedupe is now deep; (5) every multi-line
+PowerShell script is passed as `-EncodedCommand` (UTF-16LE base64) instead of
+`-Command`, removing the `"`/`$`/backtick quoting risk that the toast, voice,
+capture and picker scripts carried; `-STA` goes before it for the dialog.

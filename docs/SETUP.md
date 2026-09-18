@@ -404,6 +404,53 @@ tile names, so it's accurate even with a laptop mic, and Fay only listens for
 six seconds after you press — never continuously. The first *Listen* after
 start takes a second longer while the engine loads.
 
+## AI — talk to Fay in plain language
+
+Type what you want instead of a tile name. If nothing on the deck matches
+what you typed, **Enter** hands the line to Fay's model; `? …` asks
+explicitly:
+
+| You type | Fay does |
+| :-- | :-- |
+| `game mode but keep audio on speakers` | fires the Game scene with the audio switch overridden |
+| `open zen and discord, then focus 25` | three actions in order |
+| `close the game stuff` | runs the Game scene's `closes` list |
+| `? what's a good name for this project` | just answers (no actions) |
+
+The reply is shown (and spoken, if voice is on) and the actions run through
+the same path as clicks. If a step fails Fay tells the model what went wrong
+and lets it adjust once or twice (bounded). Shutdown / restart / sign-out /
+hibernate never run unless *your own* message clearly asked for or confirmed
+them — the model can only ask. Conversation memory lasts until the deck
+closes, so you can answer a follow-up question by just typing.
+
+**Setup.** In `app.ai`:
+
+```json
+"ai": { "provider": "anthropic", "model": "claude-sonnet-5", "apiKey": "sk-ant-…" }
+```
+
+The key lives only in your local config (`%APPDATA%\com.fay.hub\`), never in
+the repo; the `ANTHROPIC_API_KEY` environment variable works too. For a fully
+local setup run [Ollama](https://ollama.com) and use
+`"ai": { "provider": "ollama", "model": "llama3.2" }` (a vision-capable model
+such as `llama3.2-vision` for screen questions). `"ai": false` turns it off.
+
+### Ask about the screen
+
+The **Ask about screen** tile (`Ctrl+Alt+A` in the starter deck, works while
+Fay is hidden) captures the window in front *before* Fay appears, then opens
+the ask line with 📷 attached: *"what does this error mean?"*, *"summarize
+this page"*. The capture is sent once, with that question only, and never
+stored on disk. Nothing is captured unless you press it.
+
+## Add app — browse for a program
+
+The dashed **+ Add app** tile opens a normal file picker; the chosen `.exe`,
+`.lnk`, `.bat`, `.cmd` or `.ps1` is appended to `apps` in your config and Fay
+reloads. `"addTile": false` hides it. (Editing the config file stays the way
+to rename, reorder or give it a hotkey.)
+
 ## Which monitor Fay opens on
 
 `"summonOn": "cursor"` (default) shows Fay on the monitor under the mouse;

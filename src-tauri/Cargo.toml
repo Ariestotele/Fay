@@ -1,6 +1,6 @@
 [package]
 name = "fay"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fay — a minimal dark desktop launcher hub."
 edition = "2021"
 
@@ -17,6 +17,8 @@ serde_json = "1"
 sysinfo = "0.33"
 # Firefox-family bookmark backups (Zen, Firefox, LibreWolf…) are mozlz4 files.
 lz4_flex = "0.11"
+# AI: Anthropic Messages API / local Ollama (blocking client, run off the main thread).
+ureq = { version = "2", features = ["json"] }
 
 # Windows-only native bits: the low-level mouse hook (Ctrl+Mouse5 summon),
 # SendInput (media keys, snippet paste) and the clipboard.

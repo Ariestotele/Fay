@@ -139,6 +139,25 @@ fn perform(a: &TileAction) -> Result<Option<String>, String> {
         }
         "say" => voice_say(a.text.as_deref().unwrap_or(""))?,
         "listen" => voice_listen()?,
+        // Screen-aware ask: capture the window in front *before* Fay covers it.
+        "ask" => {
+            let w = APP.get().and_then(|app| app.get_webview_window("main"));
+            let Some(w) = w else { return Err("no window".into()) };
+            if w.is_visible().unwrap_or(false) {
+                let _ = w.hide();
+                std::thread::sleep(std::time::Duration::from_millis(300));
+            }
+            let shot = capture_foreground();
+            let ok = shot.is_ok();
+            let inner = w.clone();
+            let _ = w.run_on_main_thread(move || {
+                fill_active_monitor(&inner);
+                let _ = inner.show();
+                let _ = inner.set_focus();
+                let _ = inner.eval(&format!("window.__fayAsk && window.__fayAsk({ok})"));
+            });
+            shot?;
+        }
         _ => match a.target.as_deref().filter(|t| !t.is_empty()) {
             Some(t) => do_launch(t, a.elevated)?,
             None => return Err("tile has no target".into()),
@@ -256,8 +275,7 @@ fn spawn_voice() -> Result<VoiceProc, String> {
         let script = VOICE_SCRIPT
             .replace("__RATE__", &VOICE_RATE.load(std::sync::atomic::Ordering::Relaxed).clamp(-10, 10).to_string())
             .replace("__VOICE__", &name);
-        let mut child = cmd("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        let mut child = powershell_script(&script)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
@@ -896,6 +914,228 @@ async fn list_bookmarks(refresh: Option<bool>) -> Result<Vec<Bookmark>, String> 
     Ok(list)
 }
 
+// ---- AI: natural-language deck control + screen-aware questions -------------
+// Provider is Anthropic (API key from config or ANTHROPIC_API_KEY) or a local
+// Ollama. The frontend owns the prompt and the plan execution; this side only
+// makes the HTTP call and holds the last screenshot.
+
+#[derive(Clone, Default)]
+struct AiConfig {
+    provider: String,
+    model: String,
+    api_key: String,
+    ollama_url: String,
+}
+static AI: std::sync::Mutex<Option<AiConfig>> = std::sync::Mutex::new(None);
+static SCREEN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+#[tauri::command]
+fn ai_config(provider: Option<String>, model: Option<String>, api_key: Option<String>, ollama_url: Option<String>) -> Result<String, String> {
+    let provider = provider.unwrap_or_default().trim().to_lowercase();
+    let provider = if provider.is_empty() { "anthropic".to_string() } else { provider };
+    let api_key = api_key
+        .filter(|k| !k.trim().is_empty())
+        .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let cfg = AiConfig {
+        model: model.filter(|m| !m.trim().is_empty()).unwrap_or_else(|| {
+            if provider == "ollama" { "llama3.2".into() } else { "claude-sonnet-5".into() }
+        }),
+        ollama_url: ollama_url
+            .filter(|u| !u.trim().is_empty())
+            .unwrap_or_else(|| "http://localhost:11434".into())
+            .trim_end_matches('/')
+            .to_string(),
+        api_key,
+        provider,
+    };
+    let status = if cfg.provider == "ollama" {
+        format!("ollama · {}", cfg.model)
+    } else if cfg.api_key.is_empty() {
+        "no API key".to_string()
+    } else {
+        format!("anthropic · {}", cfg.model)
+    };
+    if let Ok(mut g) = AI.lock() {
+        *g = Some(cfg);
+    }
+    Ok(status)
+}
+
+#[derive(serde::Deserialize)]
+struct ChatMessage {
+    role: String,
+    content: String,
+}
+
+/// Capture the foreground window (or the primary screen) as a PNG data string.
+fn capture_foreground() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        const PS: &str = r#"
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class FayWin {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L; public int T; public int R; public int B; }
+}
+"@
+[void][FayWin]::SetProcessDPIAware()
+$h = [FayWin]::GetForegroundWindow()
+$r = New-Object FayWin+RECT
+[void][FayWin]::GetWindowRect($h, [ref]$r)
+$x = $r.L; $y = $r.T; $w = $r.R - $r.L; $hh = $r.B - $r.T
+if ($w -lt 80 -or $hh -lt 80) { $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $x = $b.X; $y = $b.Y; $w = $b.Width; $hh = $b.Height }
+$bmp = New-Object System.Drawing.Bitmap $w, $hh
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.CopyFromScreen($x, $y, 0, 0, $bmp.Size)
+$scale = [Math]::Min(1.0, 1400.0 / $w)
+if ($scale -lt 1) { $bmp = New-Object System.Drawing.Bitmap $bmp, ([int]($w * $scale)), ([int]($hh * $scale)) }
+$ms = New-Object IO.MemoryStream
+$bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+[Convert]::ToBase64String($ms.ToArray())
+"#;
+        let out = powershell_script(PS).output().map_err(|e| e.to_string())?;
+        let b64 = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !out.status.success() || b64.len() < 100 {
+            return Err("screen capture failed".into());
+        }
+        if let Ok(mut g) = SCREEN.lock() {
+            *g = Some(b64);
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("screen capture is only implemented on Windows".into())
+    }
+}
+
+#[tauri::command]
+async fn capture_screen() -> Result<(), String> {
+    capture_foreground()
+}
+
+/// One round-trip to the model. `with_screen` attaches the last capture to
+/// the final user message. Returns the assistant's text.
+#[tauri::command]
+async fn ai_ask(system: String, messages: Vec<ChatMessage>, with_screen: bool) -> Result<String, String> {
+    let cfg = AI.lock().ok().and_then(|g| g.clone()).ok_or("AI is not configured (app.ai)")?;
+    let shot = if with_screen { SCREEN.lock().ok().and_then(|g| g.clone()) } else { None };
+    let agent = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(90))
+        .build();
+    let n = messages.len();
+    if cfg.provider == "ollama" {
+        let mut msgs = vec![serde_json::json!({ "role": "system", "content": system })];
+        for (i, m) in messages.iter().enumerate() {
+            let mut v = serde_json::json!({ "role": m.role, "content": m.content });
+            if i + 1 == n {
+                if let Some(s) = &shot {
+                    v["images"] = serde_json::json!([s]);
+                }
+            }
+            msgs.push(v);
+        }
+        let body = serde_json::json!({ "model": cfg.model, "messages": msgs, "stream": false });
+        let resp = agent
+            .post(&format!("{}/api/chat", cfg.ollama_url))
+            .send_json(body)
+            .map_err(|e| ai_err("ollama", e))?;
+        let v: serde_json::Value = resp.into_json().map_err(|e| e.to_string())?;
+        return v["message"]["content"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| "ollama: empty reply".into());
+    }
+    if cfg.api_key.is_empty() {
+        return Err("no API key — set app.ai.apiKey in your config (or ANTHROPIC_API_KEY)".into());
+    }
+    let mut msgs = Vec::new();
+    for (i, m) in messages.iter().enumerate() {
+        let content = if i + 1 == n && shot.is_some() {
+            serde_json::json!([
+                { "type": "image", "source": { "type": "base64", "media_type": "image/png", "data": shot.as_ref().unwrap() } },
+                { "type": "text", "text": m.content }
+            ])
+        } else {
+            serde_json::json!(m.content)
+        };
+        msgs.push(serde_json::json!({ "role": m.role, "content": content }));
+    }
+    let body = serde_json::json!({
+        "model": cfg.model,
+        "max_tokens": 700,
+        "system": system,
+        "messages": msgs
+    });
+    let resp = agent
+        .post("https://api.anthropic.com/v1/messages")
+        .set("x-api-key", &cfg.api_key)
+        .set("anthropic-version", "2023-06-01")
+        .set("content-type", "application/json")
+        .send_json(body)
+        .map_err(|e| ai_err("anthropic", e))?;
+    let v: serde_json::Value = resp.into_json().map_err(|e| e.to_string())?;
+    let text = v["content"]
+        .as_array()
+        .map(|blocks| {
+            blocks
+                .iter()
+                .filter_map(|b| b["text"].as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default();
+    if text.is_empty() {
+        Err("anthropic: empty reply".into())
+    } else {
+        Ok(text)
+    }
+}
+
+fn ai_err(who: &str, e: ureq::Error) -> String {
+    match e {
+        ureq::Error::Status(code, resp) => {
+            let body = resp.into_string().unwrap_or_default();
+            let msg = serde_json::from_str::<serde_json::Value>(&body)
+                .ok()
+                .and_then(|v| v["error"]["message"].as_str().map(|s| s.to_string()))
+                .unwrap_or(body);
+            format!("{who}: HTTP {code} — {}", msg.chars().take(200).collect::<String>())
+        }
+        ureq::Error::Transport(t) => format!("{who}: {t}"),
+    }
+}
+
+/// Native "browse for a program" dialog (WinForms, STA PowerShell). Returns
+/// the chosen path, or None if cancelled.
+#[tauri::command]
+async fn pick_file() -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        const PS: &str = r#"Add-Type -AssemblyName System.Windows.Forms
+$d = New-Object System.Windows.Forms.OpenFileDialog
+$d.Title = 'Fay — choose a program, shortcut or script'
+$d.Filter = 'Programs & shortcuts|*.exe;*.lnk;*.bat;*.cmd;*.ps1|All files|*.*'
+$d.InitialDirectory = [Environment]::GetFolderPath('ProgramFiles')
+if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $d.FileName }"#;
+        let out = powershell_script_with(&["-STA"], PS).output().map_err(|e| e.to_string())?;
+        let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        Ok(if p.is_empty() { None } else { Some(p) })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("file picker is only implemented on Windows".into())
+    }
+}
+
 /// A Windows toast (used when the focus timer ends while Fay is hidden).
 #[tauri::command]
 async fn notify(title: String, body: String) -> Result<(), String> {
@@ -920,10 +1160,7 @@ $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
 $xml.LoadXml("<toast><visual><binding template='ToastGeneric'><text>{t}</text><text>{b}</text></binding></visual></toast>")
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($aumid).Show([Windows.UI.Notifications.ToastNotification]::new($xml))"#
         );
-        cmd("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        powershell_script(&ps).spawn().map_err(|e| e.to_string())?;
         Ok(())
     }
     #[cfg(not(target_os = "windows"))]
@@ -1150,6 +1387,20 @@ struct Hotkeys {
     items: Vec<(Shortcut, HotkeyBinding)>,
 }
 type HotkeyState = std::sync::Mutex<Hotkeys>;
+
+/// PowerShell with a multi-line script passed as `-EncodedCommand` (UTF-16LE
+/// base64), which sidesteps every command-line quoting rule for `"`, `$`, etc.
+fn powershell_script(script: &str) -> std::process::Command {
+    powershell_script_with(&[], script)
+}
+fn powershell_script_with(flags: &[&str], script: &str) -> std::process::Command {
+    let utf16: Vec<u8> = script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+    let mut c = cmd("powershell");
+    c.args(["-NoProfile", "-NonInteractive"]);
+    c.args(flags);
+    c.args(["-EncodedCommand", &b64(&utf16)]);
+    c
+}
 
 /// Build a child-process command that never flashes a console window. Fay is a
 /// GUI app; without CREATE_NO_WINDOW every `cmd`/`powershell` call would pop a
@@ -1833,7 +2084,11 @@ fn main() {
             voice_config,
             say,
             listen,
-            set_voice_grammar
+            set_voice_grammar,
+            ai_config,
+            ai_ask,
+            capture_screen,
+            pick_file
         ])
         .setup(|app| {
             let _ = APP.set(app.handle().clone());

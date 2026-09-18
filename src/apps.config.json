@@ -17,7 +17,9 @@
     "voice": true,
     "voiceRate": 0,
     "voiceName": "",
-    "voiceConfirm": true
+    "voiceConfirm": true,
+    "ai": { "provider": "anthropic", "model": "claude-sonnet-5", "apiKey": "", "ollamaUrl": "http://localhost:11434" },
+    "addTile": true
   },
   "scenes": [
     {
@@ -70,7 +72,8 @@
     ], "hint": "pause music, then lock" },
     { "id": "focus", "name": "Focus 25", "glyph": "◔", "kind": "focus", "minutes": 25, "hotkey": "Ctrl+Alt+F", "hint": "pomodoro · again to stop" },
     { "id": "clip",  "name": "Clipboard", "glyph": "⎘", "kind": "clipboard", "hotkey": "Ctrl+Alt+V", "hint": "history · Enter pastes · type > for files, @ for bookmarks" },
-    { "id": "listen", "name": "Listen", "glyph": "◉", "kind": "listen", "hotkey": "Ctrl+Alt+L", "hint": "then say a tile name — “game”, “open discord”, “close game”" }
+    { "id": "listen", "name": "Listen", "glyph": "◉", "kind": "listen", "hotkey": "Ctrl+Alt+L", "hint": "then say a tile name — “game”, “open discord”, “close game”" },
+    { "id": "ask",    "name": "Ask about screen", "glyph": "◈", "kind": "ask", "hotkey": "Ctrl+Alt+A", "hint": "captures the window in front, then ask — needs ai.apiKey" }
   ],
   "packs": ["power", "media"],
   "commands": true,

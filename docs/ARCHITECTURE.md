@@ -51,7 +51,19 @@ set_clipboard_watch(on, max) / clipboard_history() / clipboard_pick(text, paste)
 search_files(query, max, es?) // Everything es.exe; reveal(path) opens Explorer
 list_bookmarks(refresh?)  // Zen/Firefox jsonlz4 backups + Chromium Bookmarks JSON, 5-min cache
 voice_config(on, rate, name) / say(text) / listen() / set_voice_grammar(phrases)
+ai_config(provider, model, apiKey, ollamaUrl) / ai_ask(system, messages, withScreen) / capture_screen()
+pick_file()               // WinForms OpenFileDialog (STA PowerShell) for "+ Add app"
 ```
+
+**AI** (`app.js` owns the brain, Rust only does HTTP): the system prompt
+carries the deck as JSON and a small action vocabulary; the model must answer
+with `{"reply","actions","question"}`. `stepFromPlan` maps each action onto a
+`TileAction` (unknown ids and unconfirmed destructive actions are dropped),
+the whole plan runs as one `multi` through `fire`, and a failing step is fed
+back to the model for up to two more rounds. The last screenshot (foreground
+window, captured *before* Fay shows, downscaled to ≤1400 px) lives in memory
+and is attached only to the message that asked for it. Multi-line PowerShell
+scripts are passed with `-EncodedCommand` so quoting can't break them.
 
 **Voice** is one persistent PowerShell process hosting `System.Speech`'s
 synthesizer and recognizer (started when `app.voice` is on, restarted on
