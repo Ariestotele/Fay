@@ -147,8 +147,10 @@ body.in-folder .group--folder { display: flex; }
 
 /* results mode (files / bookmarks / clipboard): rows replace the tile grid */
 .results { display: none; flex-direction: column; gap: 4px; width: 720px; max-width: 92vw; }
-body.results .results { display: flex; }
-body.results .groups, body.results .group--folder { display: none; }
+/* The body state class is "in-results", never "results": that would match
+   the .results panel rule above and hide the whole body. */
+body.in-results .results { display: flex; }
+body.in-results .groups, body.in-results .group--folder { display: none; }
 .row {
   display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px;
   padding: 8px 12px; border-radius: 10px; text-align: left;

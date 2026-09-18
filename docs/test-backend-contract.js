@@ -34,6 +34,13 @@ const answers = {
   search_files: (a) => a.query ? [{ name: "report.pdf", path: "D:\\\\docs\\\\report.pdf", dir: false }] : [],
   list_bookmarks: () => [{ title: "Tauri docs", url: "https://tauri.app", browser: "Zen" }],
   fire: () => null,
+  doctor: (a) => [
+    { name: "machine", ok: null, detail: "TESTPC · windows" },
+    ...a.targets.map((t) => ({ name: "tile " + t.name, ok: t.name !== "Zen", detail: t.name === "Zen" ? "not found: C:\\\\zen.exe" : "ok" })),
+    { name: "tool es.exe", ok: false, detail: "es.exe not on PATH" },
+    { name: "AI", ok: true, detail: "anthropic · key set" },
+  ],
+  set_clipboard: () => null,
 };
 window.__TAURI__ = { core: { invoke: async (cmd, args) => { window.__calls.push({ cmd, args: args || {} }); const f = answers[cmd]; return f ? f(args || {}) : null; } } };
 `;
@@ -54,6 +61,7 @@ window.__TAURI__ = { core: { invoke: async (cmd, args) => { window.__calls.push(
   const status = () => page.$eval("#status", (e) => e.textContent);
   const reset = () => page.evaluate(() => { window.__calls = []; });
   const inBody = (cls) => page.$eval("body", (b, c) => b.classList.contains(c), cls);
+  const shown = (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && document.body.getBoundingClientRect().height > 0; });
 
   // ---- startup contract ----
   ok("no page errors", errors.length === 0, errors.join(" | "));
@@ -147,6 +155,7 @@ window.__TAURI__ = { core: { invoke: async (cmd, args) => { window.__calls.push(
   ok("ai_ask gets the system prompt with the deck + user message", ask?.system.includes('"id":"game"') && ask.messages[0].role === "user" && ask.messages[0].content === "game mode but keep speakers");
   f = await last("fire");
   ok("plan runs as one multi with the Game tile, audio override cleared", f?.action.kind === "multi" && f.action.steps[0].target.endsWith("Fay-Game.lnk") && f.action.steps[0].audioOut === null);
+  ok("answer panel is painted on screen", await shown(".answer__text"));
   ok("reply shown in the answer panel", (await page.$eval(".answer__text", (e) => e.textContent)).includes("speakers stay"));
   ok("spoken via say", (await last("say"))?.text.includes("speakers stay"));
 
@@ -162,6 +171,23 @@ window.__TAURI__ = { core: { invoke: async (cmd, args) => { window.__calls.push(
   f = await last("fire");
   ok("confirmed shutdown is sent", f?.action.steps?.[0]?.kind === "system" && f.action.steps[0].action === "shutdown");
   await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
+
+  // ---- doctor: targets sent, rows rendered, Enter copies the report ----
+  await reset();
+  if (!(await inBody("open"))) { await page.keyboard.press("Enter"); await page.waitForTimeout(100); }
+  await page.click(".tile--k-doctor"); await page.waitForTimeout(300);
+  const d = await last("doctor");
+  const names = (d?.targets || []).map((t) => t.name);
+  ok("doctor sends launch targets only (scenes + apps, no quicklinks / multi)", names.includes("Zen") && names.includes("Game") && !names.includes("YouTube") && !names.includes("Wind down"), names.join());
+  ok("doctor passes the Everything path from config", d && "es" in d);
+  const report = await page.$eval(".answer__text", (e) => e.textContent);
+  ok("report panel is painted on screen", await shown(".answer__text"));
+  ok("report lists backend rows with marks", report.includes("✗ tile Zen: not found") && report.includes("· machine: TESTPC") && report.includes("✓ AI:"), report.split("\n").slice(0, 3).join(" / "));
+  ok("report counts problems in the meta line", (await page.$eval(".answer__meta", (e) => e.textContent)).includes("2 problems"));
+  await page.keyboard.press("Enter"); await page.waitForTimeout(100);
+  ok("Enter copies the report via set_clipboard", ((await last("set_clipboard"))?.text || "").includes("✗ tile Zen"));
+  await page.keyboard.press("Escape"); await page.waitForTimeout(50);
+  ok("Esc closes the report", !(await inBody("in-results")) && (await inBody("open")));
 
   // ---- focus hotkey entry point used by the backend ----
   await page.evaluate(() => window.__fayFocus(5, "start"));

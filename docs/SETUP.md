@@ -451,6 +451,32 @@ The dashed **+ Add app** tile opens a normal file picker; the chosen `.exe`,
 reloads. `"addTile": false` hides it. (Editing the config file stays the way
 to rename, reorder or give it a hotkey.)
 
+## Doctor — the first-run self-check
+
+Press the **Doctor** tile (in the starter deck; also in the `tools` pack, or
+add `{ "id": "doctor", "name": "Doctor", "kind": "doctor" }` anywhere). It
+runs every check CI can't and shows one report:
+
+- config problems (typos in keys get a *did you mean* hint);
+- every launch tile's `target`: file found / on PATH / not found (protocol
+  links like `steam://` are just noted);
+- helper tools: PowerShell, PowerToys, SoundVolumeView, Everything `es.exe`,
+  `nvidia-smi`;
+- the clipboard watcher, bookmark count, voice host state, and whether AI has
+  a key (for Ollama it also pings the server).
+
+**Enter copies the whole report** to the clipboard — paste it into a chat or an
+issue instead of describing what happens tile by tile. Esc closes it.
+
+## Config validation
+
+Every key is checked on load. Unknown or misspelled keys (`"hotkeys"`,
+`"audioOutput"`, `"apikey"`) are reported with the nearest real key; values are
+type- and range-checked (`accent` must be `"auto"` or `#rrggbb`, `backdrop`
+0–1, `voiceRate` −10…10, `ai.provider` `anthropic`/`ollama`, …). Problems show
+in the footer and in the Doctor report, and never stop Fay from starting. Keys
+starting with `_` are ignored (use them for comments).
+
 ## Which monitor Fay opens on
 
 `"summonOn": "cursor"` (default) shows Fay on the monitor under the mouse;

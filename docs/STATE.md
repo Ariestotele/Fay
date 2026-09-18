@@ -3,15 +3,17 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** **Phases 1–24 merged; v0.2.1 released.** The "do them
-all" run shipped six batches (PRs #18–#22), then a rendered debug round fixed
-the Heart's scale and the owner picked a polished look from real screenshots
-(PRs #24–#25). Everything compiles on Windows CI; **none of it has been run by
-a human yet** — the next thing that matters is the owner installing v0.2.1
-and reporting what actually works. Expect a fix-up round. Next candidate
-features (owner-ranked "viral four"): wake word, now-playing on the Heart,
-AI memory, screen text grab — see the end of this file.
-**v0.2.1 is the release to install** (Phases 1–24, with the Heart scale fix and polish); v0.2.0 predates the Heart fixes. (Its
+**Current phase:** **Phases 1–27 merged; v0.2.2 released.** The "do them
+all" run shipped six batches (PRs #18–#22), then rendered debug rounds fixed
+the Heart's scale, the `@` teardown clash and — in round 6 — results mode
+being invisible (v0.2.1 ships that bug). Three automated test layers run in
+CI (frontend flows, backend contract, Rust unit). **None of it has been run by
+a human yet** — the next thing that matters is the owner installing v0.2.2,
+pressing the **Doctor** tile and pasting its report (Enter copies it). Next
+candidate features (owner-ranked "viral four"): wake word, now-playing on the
+Heart, AI memory, screen text grab — see the end of this file.
+**v0.2.2 is the release to install** (Phases 1–27); v0.2.1 hides every results
+panel, v0.2.0 predates the Heart fixes. (The v0.2.0
 page also carries a stale `Fay_0.1.0_x64-setup.exe` picked up from the CI
 cache — harmless, delete it from the release's edit page if it bothers you;
 the workflows now clear old bundles before building.)
@@ -47,21 +49,27 @@ the workflows now clear old bundles before building.)
 | 23 | **Debug round 3 / first real render** — `docs/render-preview.js` screenshots the real frontend in headless Chromium; fixed the Heart drawn at ¼ size, `accent: "auto"` parsing as black, a duplicate tile id, and deck overflow (hint clamp, scrolling deck). `docs/ui-preview.png` + `ui-deck.png` are real renders now |
 | 24 | **Heart polish (owner-approved variant B + extras)** — soft halo under both bands, tighter band cores, brighter sphere core with bloom, clock tucked into the sphere's rim, wordmark at half opacity, quieter tile borders/glass so the Heart reads through the deck |
 | 25 | **Debug round 4 / frontend flow tests** — `docs/test-frontend.js` (34 checks in headless Chromium) runs in CI's `config` job; its first run found and fixed `@` being eaten by the Shift+digit teardown → teardown is now **Ctrl+digit**, digit shortcuts key off `e.key` |
-| 26 | **Debug round 5 / contract + unit tests** — `docs/test-backend-contract.js` (40 checks against a fake Tauri bridge: startup calls, bindings, exact `fire` payloads, clipboard/file/bookmark flows, AI plan → multi, destructive gate) and a `cargo test` module for the Rust helpers; both in CI (in PR) |
+| 26 | **Debug round 5 / contract + unit tests** — `docs/test-backend-contract.js` (40 checks against a fake Tauri bridge: startup calls, bindings, exact `fire` payloads, clipboard/file/bookmark flows, AI plan → multi, destructive gate) and a `cargo test` module for the Rust helpers; both in CI |
+| 27 | **Doctor tile + full config validation + debug round 6** — `kind: "doctor"` → `doctor` command (tile targets exist / on PATH, tools, voice host, AI, clipboard, bookmarks) rendered as a report, Enter copies it; `validateConfig` checks the whole `app` block and flags unknown keys anywhere with *did you mean*; rendering the panel exposed that **results mode hid the whole body** since Phase 20 (body class `results` matched `.results { display:none }`) → `in-results`, painted-on-screen assertions in both suites; v0.2.2 |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
-- **config** (Ubuntu) — JSON validation + `node -c` on `app.js` / `heart.js`.
-- **build-check** (Windows) — `cargo check` compiles the Tauri app on every push/PR.
+- **config** (Ubuntu) — JSON validation, `node -c`, then the two headless-Chromium
+  suites: `docs/test-frontend.js` (flows, preview mode) and
+  `docs/test-backend-contract.js` (fake Tauri bridge, exact payloads). Both
+  assert panels are *painted*, not just present.
+- **build-check** (Windows) — `cargo check` + `cargo test` (pure helpers, `check_target`).
 - **installer** (Windows) — `tauri build --bundles nsis` → uploads
   `Fay-windows-installer` artifact on every push/PR. Download it from the
   Actions run → no toolchain needed to test.
 
 ## 📌 Pending — owner tasks (can't be automated)
 
-- [ ] **Run Fay** — install **v0.2.1 from the Releases page** (or any newer CI
-      artifact) and give feedback on the Heart — density, pulse, backdrop
-      dimness, ball size, tile layout — and whether Ctrl+Mouse5 works.
+- [ ] **Run Fay** — install **v0.2.2 from the Releases page** (or any newer CI
+      artifact), press `Ctrl+Alt+Space`, then the **Doctor** tile, press
+      **Enter** (copies the report) and paste it into the chat. That one
+      paste answers most of the items below. Then feedback on the Heart —
+      density, pulse, backdrop dimness, ball size — and whether Ctrl+Mouse5 works.
 - [ ] Verify the exe paths for **Zen / Claude / LifeOS** — edit via tray › *Open
       config file* (`%APPDATA%\com.fay.hub\apps.config.json`), then *Reload config*.
 - [ ] Create the three **PowerToys Workspaces** + desktop shortcuts

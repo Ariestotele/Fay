@@ -26,6 +26,8 @@ const ok = (name, cond, extra = "") => { console.log(`${cond ? "PASS" : "FAIL"} 
   const filter = () => page.$eval("#filter", (e) => e.textContent);
   const visible = () => page.evaluate(() => [...(document.body.classList.contains("in-folder") ? document.getElementById("folder") : document.getElementById("groups")).querySelectorAll(".tile:not(.is-hidden)")].map((e) => e.dataset.name));
   const inBody = (cls) => page.$eval("body", (b, c) => b.classList.contains(c), cls);
+  // Painted on screen: a non-empty box, and no ancestor collapsed (display:none).
+  const shown = (sel) => page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && document.body.getBoundingClientRect().height > 0; });
   const numbered = () => page.$$eval(".tile__idx", (els) => els.map((e) => e.textContent).filter(Boolean));
 
   ok("no page errors on load", errors.length === 0, errors.join(" | "));
@@ -93,9 +95,10 @@ const ok = (name, cond, extra = "") => { console.log(`${cond ? "PASS" : "FAIL"} 
   // results modes (preview: providers return empty)
   await page.keyboard.type("> report");
   await page.waitForTimeout(400);
-  ok("files mode shows results panel", await inBody("results"));
+  ok("files mode shows results panel", await inBody("in-results"));
+  ok("results panel is painted (body not collapsed by a class clash)", await shown("#results"));
   await page.keyboard.press("Escape");
-  ok("Esc leaves results mode", !(await inBody("results")));
+  ok("Esc leaves results mode", !(await inBody("in-results")));
   await page.keyboard.type("@ tauri");
   await page.waitForTimeout(200);
   ok("bookmarks mode ('@' must not be eaten as Shift+2)", (await filter()).includes("bookmarks"), await filter());
@@ -122,6 +125,31 @@ const ok = (name, cond, extra = "") => { console.log(`${cond ? "PASS" : "FAIL"} 
   // Shift+digit teardown on a scene with closes
   await page.keyboard.press("Control+Digit2"); await page.waitForTimeout(150);
   ok("Ctrl+2 tears down Game (preview)", (await status()).includes("Game"), await status());
+
+  // doctor tile: report panel in preview, Enter "copies", Esc closes it
+  await page.click(".tile--k-doctor"); await page.waitForTimeout(200);
+  const rep = await page.$eval(".answer__text", (e) => e.textContent);
+  ok("doctor report panel is painted", await shown(".answer__text"));
+  ok("doctor report shown (preview)", rep.includes("browser preview") && rep.includes("✓ config: no problems"), rep.split("\n")[0]);
+  await page.keyboard.press("Enter"); await page.waitForTimeout(50);
+  ok("Enter on the report copies (preview)", (await status()).includes("copy"), await status());
+  await page.keyboard.press("Escape"); await page.waitForTimeout(50);
+  ok("Esc closes the report, deck stays open", !(await inBody("in-results")) && (await inBody("open")));
+
+  // config validation: app keys, typos, ranges (pure function, called directly)
+  const probs = await page.evaluate(() => validateConfig({
+    app: { hotkeys: "Ctrl+Alt+Space", accent: "teal", backdrop: 2, ai: { provider: "anthropc", apikey: "x" }, voiceRate: 99 },
+    apps: [{ id: "a", name: "A", target: "a.exe", audioOutput: "Speakers" }, { id: "b", name: "B", kind: "snipet", text: "x" }],
+    scene: [],
+  }, {}));
+  const has = (s) => probs.some((p) => p.includes(s));
+  ok("typo in app key → did you mean", has(`unknown app key "hotkeys" (did you mean "hotkey"?)`), probs.join(" | "));
+  ok("bad accent / backdrop / voiceRate flagged", has("app.accent must be") && has("app.backdrop must be") && has("app.voiceRate must be"));
+  ok("ai provider + key typo flagged", has(`app.ai.provider must be`) && has(`unknown app.ai key "apikey" (did you mean "apiKey"?)`));
+  ok("tile key typo flagged", has(`"a": unknown key "audioOutput" (did you mean "audioOut"?)`));
+  ok("kind typo flagged", has(`"b": unknown kind "snipet" (did you mean "snippet"?)`));
+  ok("top-level typo flagged", has(`unknown top-level key "scene" (did you mean "scenes"?)`));
+  ok("bundled config + packs validate clean", (await page.evaluate(async () => validateConfig(await (await fetch("apps.config.json")).json(), await (await fetch("packs.json")).json()))).length === 0);
 
   // close deck via Esc
   await page.keyboard.press("Escape");

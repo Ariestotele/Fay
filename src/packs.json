@@ -24,6 +24,7 @@
     "group": "system",
     "tiles": [
       { "id": "sys-clipboard","name": "Clipboard",         "glyph": "⎘", "kind": "clipboard", "hint": "history · Enter pastes" },
+      { "id": "sys-doctor",   "name": "Doctor",            "glyph": "✚", "kind": "doctor",    "hint": "self-check · Enter copies the report" },
       { "id": "sys-recycle",  "name": "Empty Recycle Bin", "glyph": "🗑", "kind": "system", "action": "recycle" },
       { "id": "sys-darkmode", "name": "Toggle dark mode",  "glyph": "◐", "kind": "system", "action": "darkmode" },
       { "id": "sys-hibernate","name": "Hibernate",         "glyph": "❄", "kind": "system", "action": "hibernate", "hint": "press twice" },

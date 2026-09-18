@@ -202,6 +202,13 @@
       "kind": "ask",
       "hotkey": "Ctrl+Alt+A",
       "hint": "captures the window in front — needs ai.apiKey"
+    },
+    {
+      "id": "doctor",
+      "name": "Doctor",
+      "glyph": "✚",
+      "kind": "doctor",
+      "hint": "checks paths, tools, voice, AI · Enter copies the report"
     }
   ],
   "packs": [

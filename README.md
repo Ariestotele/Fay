@@ -45,6 +45,7 @@ Every push to `main` also produces a fresh installer under
 | **Voice** | Offline, built into Windows. Tiles can `say` a reply; press *Listen* and say *"game"* or *"open discord"*. The Heart wobbles while it talks. |
 | **AI** | Type *"game mode but keep audio on speakers"* — Fay's model picks the actions and replies. Screen-aware questions with `Ctrl+Alt+A`. Anthropic API key or local Ollama. |
 | **Add app** | A dashed *+* tile opens a file picker and writes the tile into your config. |
+| **Doctor** | One tile checks every tile path, helper tool, voice and AI setup, and config typos (*did you mean "hotkey"?*). Enter copies the report. ([see it](docs/ui-doctor.png)) |
 | **Real icons** | Each tile shows its app's actual icon, extracted and cached automatically. |
 | **Running dot** | Apps already open get a glowing dot, so a scene doesn't relaunch them by surprise. |
 | **Accent auto** | Colors follow your Windows accent color (or pin a hex). |
@@ -102,7 +103,7 @@ Notepad. Save, then tray › **Reload config**.
 | `minutes` | tile | With `"kind": "focus"`: start a focus timer of that length (`"action": "stop"` for a stop tile). |
 | `packs` | root | Preset tile sets: `power`, `media`, `tools`, `settings`, `links`. See [docs/SETUP.md](docs/SETUP.md). |
 | `system` | root | A third tile group, next to `scenes` and `apps`. |
-| `kind` | tile | `launch` (default), `system`, `media` or `snippet`. |
+| `kind` | tile | `launch` (default), `system`, `media`, `snippet`, `multi`, `close`, `focus`, `clipboard`, `say`, `listen`, `ask`, `add` or `doctor`. |
 | `action` | tile | `system`: `lock sleep hibernate restart shutdown logoff recycle darkmode`. `media`: `playpause next prev stop mute volup voldown`. |
 | `text` / `paste` | tile | Snippet text; `"paste": false` copies without pasting. |
 | `keyword` | tile | Quicklink keyword for a `target` containing `{query}` (defaults to `id`). |
@@ -144,4 +145,4 @@ The project's working memory is in `docs/`: **STATE.md** (what's done / next),
 
 ## Status
 
-Twenty-two phases shipped and CI-green — the whole researched pipeline. See [docs/STATE.md](docs/STATE.md).
+Twenty-seven phases shipped and CI-green — the whole researched pipeline plus three automated test layers. See [docs/STATE.md](docs/STATE.md).
