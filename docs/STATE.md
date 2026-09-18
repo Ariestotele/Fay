@@ -3,9 +3,9 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** Phases 1–7 merged to `main` (all CI-green). **Phase 8 (direct
-scene/app hotkeys) in PR.** Build-day queue in progress (see Pipeline). Owner has
-not yet runtime-tested; installer artifacts are available per push.
+**Current phase:** Phases 1–8 merged to `main` (all CI-green). **Phase 9
+(installed-build readiness) in PR** — this is the artifact the owner should
+install for the first runtime test. Build-day queue in progress (see Pipeline).
 
 ## ✅ Done (all merged)
 
@@ -19,7 +19,8 @@ not yet runtime-tested; installer artifacts are available per push.
 | 5 | Autostart at login (`app.autostart`, tauri-plugin-autostart) |
 | 6 | **The Heart** — full-monitor translucent overlay, `<canvas>` particle HUD (layered multi-speed rings + inner set + pulsing particle sphere as the open button), `accent: "auto"` (Windows accent via `get_accent_color`), `backdrop` alpha |
 | 7 | CI-built NSIS installer artifact on every push/PR (`Fay-windows-installer`) — test without a toolchain |
-| 8 | Direct scene/app hotkeys — per-tile `hotkey` fires the tile (with `audioOut`) without opening Fay; unified `HotkeyState` (in PR) |
+| 8 | Direct scene/app hotkeys — per-tile `hotkey` fires the tile (with `audioOut`) without opening Fay; unified `HotkeyState` |
+| 9 | Installed-build readiness — user-editable config seeded to `%APPDATA%\com.fay.hub\apps.config.json` (tray: Open config / Reload), starts hidden (`startHidden`), amber `warn()` surfacing in the footer (in PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -31,9 +32,10 @@ not yet runtime-tested; installer artifacts are available per push.
 
 ## 📌 Pending — owner tasks (can't be automated)
 
-- [ ] **Run Fay** (install the CI artifact, or `npm run dev`) and give feedback
-      on the Heart — density, pulse, backdrop dimness, ball size, tile layout.
-- [ ] Verify the exe paths for **Zen / Claude / LifeOS** in `src/apps.config.json`.
+- [ ] **Run Fay** (install the CI artifact from the Phase 9 merge) and give
+      feedback on the Heart — density, pulse, backdrop dimness, ball size, tile layout.
+- [ ] Verify the exe paths for **Zen / Claude / LifeOS** — edit via tray › *Open
+      config file* (`%APPDATA%\com.fay.hub\apps.config.json`), then *Reload config*.
 - [ ] Create the three **PowerToys Workspaces** + desktop shortcuts
       (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`). See SETUP.md.
 - [ ] Install **SoundVolumeView.exe** (PATH or beside Fay) for scene `audioOut`.

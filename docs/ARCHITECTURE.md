@@ -96,11 +96,15 @@ no extra capability permissions beyond `core:default`.
 - `apps`   = single launches (exe / command / path / URL).
 - `glyph`  = the little mono symbol shown on the tile (keeps it techy, no icon assets).
 
-## Why config lives in `src/` (not a separate `config/`)
+## Where the config lives
 
-The frontend `fetch()`es the config at runtime, so it must sit inside the
-bundled frontend dir (`src/`). Keeping one copy avoids a build-time copy step —
-fewer moving parts, fewer bugs. (See DECISIONS.md.)
+`src/apps.config.json` is the **bundled default** (it must sit inside the
+frontend dir so it ships with the app). Installed builds don't read it directly:
+on first run the frontend seeds a **user copy** in the app config dir
+(`%APPDATA%\com.fay.hub\apps.config.json`, via `load_config` / `save_config`)
+and loads from there thereafter, so the installed app is customizable without a
+rebuild. Tray › *Open config file* / *Reload config* edit and re-apply it. In
+browser preview (no Tauri) the bundled file is used as-is.
 
 ## Where it can go (scalability)
 
