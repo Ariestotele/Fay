@@ -37,6 +37,8 @@ Every push to `main` also produces a fresh installer under
 | **Multi-action** | `actions: [ … ]` runs steps in order with pauses — Stream Deck style. |
 | **Scene teardown** | `closes: ["Discord", "zen"]` — Shift+click a scene to close what it opened. |
 | **Commands folder** | Drop `.ps1` / `.bat` / `.exe` / `.lnk` files in a folder; they become tiles. |
+| **Live stats** | CPU · RAM · GPU · NET readouts orbit the Heart at rest, with dotted gauges. |
+| **Focus timer** | A pomodoro tile; the Heart's outer arc fills as time passes, a toast fires when it's up. |
 | **Real icons** | Each tile shows its app's actual icon, extracted and cached automatically. |
 | **Running dot** | Apps already open get a glowing dot, so a scene doesn't relaunch them by surprise. |
 | **Accent auto** | Colors follow your Windows accent color (or pin a hex). |
@@ -84,6 +86,8 @@ Notepad. Save, then tray › **Reload config**.
 | `startHidden` | `app` | Start in the tray (default `true`). |
 | `autostart` | `app` | Launch Fay at login. |
 | `summonOn` | `app` | `"cursor"` (default) opens Fay on the monitor under the mouse; `"current"` keeps the last one. |
+| `stats` / `statsInterval` | `app` | Live readouts around the Heart (default on, every 2500 ms). |
+| `minutes` | tile | With `"kind": "focus"`: start a focus timer of that length (`"action": "stop"` for a stop tile). |
 | `packs` | root | Preset tile sets: `power`, `media`, `tools`, `settings`, `links`. See [docs/SETUP.md](docs/SETUP.md). |
 | `system` | root | A third tile group, next to `scenes` and `apps`. |
 | `kind` | tile | `launch` (default), `system`, `media` or `snippet`. |
@@ -128,4 +132,4 @@ The project's working memory is in `docs/`: **STATE.md** (what's done / next),
 
 ## Status
 
-Eighteen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
+Nineteen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).

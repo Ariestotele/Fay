@@ -52,7 +52,12 @@ struct TileAction {
     wait: Option<u64>,
     #[serde(default)]
     closes: Vec<String>,
+    #[serde(default)]
+    minutes: Option<u32>,
 }
+
+/// Handle to the app for code that runs outside commands (hotkey actions).
+static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
 /// A global hotkey bound directly to a tile: pressing it performs the tile's
 /// action without opening Fay.
@@ -79,6 +84,22 @@ fn perform(a: &TileAction) -> Result<Option<String>, String> {
         "media" => do_media_key(a.action.as_deref().unwrap_or(""))?,
         "snippet" => do_paste_text(a.text.as_deref().unwrap_or(""), a.paste.unwrap_or(true))?,
         "wait" => std::thread::sleep(std::time::Duration::from_millis(a.wait.unwrap_or(500).min(60_000))),
+        // The focus timer lives in the frontend; a hotkey reaches it via eval.
+        "focus" => {
+            let minutes = a.minutes.unwrap_or(0);
+            let action = match a.action.as_deref() {
+                Some("stop") => "stop",
+                Some("toggle") => "toggle",
+                _ => "start",
+            };
+            let w = APP.get().and_then(|app| app.get_webview_window("main"));
+            match w {
+                Some(w) => w
+                    .eval(&format!("window.__fayFocus && window.__fayFocus({minutes}, '{action}')"))
+                    .map_err(|e| e.to_string())?,
+                None => return Err("no window for the focus timer".into()),
+            }
+        }
         "close" => {
             if let Some(w) = do_close(&a.closes)? {
                 warning.get_or_insert(w);
@@ -232,6 +253,110 @@ async fn list_commands(app: tauri::AppHandle, dir: Option<String>) -> Result<Vec
     }
     out.sort_by_key(|c| c.name.to_lowercase());
     Ok(out)
+}
+
+/// Live readouts drawn around the Heart. CPU / RAM / network from `sysinfo`
+/// (kept in state so usage is a delta since the previous poll); GPU load and
+/// temperature from `nvidia-smi` when present.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Stats {
+    cpu: f32,
+    ram_used: u64,
+    ram_total: u64,
+    gpu: Option<f32>,
+    gpu_temp: Option<f32>,
+    down: f64,
+    up: f64,
+}
+struct StatsState {
+    sys: sysinfo::System,
+    nets: sysinfo::Networks,
+    last: std::time::Instant,
+}
+type StatsMutex = std::sync::Mutex<StatsState>;
+
+fn gpu_stats() -> (Option<f32>, Option<f32>) {
+    let out = cmd("nvidia-smi")
+        .args(["--query-gpu=utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"])
+        .output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            let mut it = s
+                .lines()
+                .next()
+                .unwrap_or("")
+                .split(',')
+                .map(|x| x.trim().parse::<f32>().ok());
+            return (it.next().flatten(), it.next().flatten());
+        }
+    }
+    (None, None)
+}
+
+#[tauri::command]
+async fn get_stats(state: tauri::State<'_, StatsMutex>) -> Result<Stats, String> {
+    let (cpu, ram_used, ram_total, down, up) = {
+        let mut s = state.lock().map_err(|e| e.to_string())?;
+        let now = std::time::Instant::now();
+        let dt = now.duration_since(s.last).as_secs_f64().max(0.25);
+        s.last = now;
+        s.sys.refresh_cpu_usage();
+        s.sys.refresh_memory();
+        s.nets.refresh(true);
+        let (mut rx, mut tx) = (0u64, 0u64);
+        for (_, d) in s.nets.iter() {
+            rx += d.received();
+            tx += d.transmitted();
+        }
+        (
+            s.sys.global_cpu_usage(),
+            s.sys.used_memory(),
+            s.sys.total_memory(),
+            rx as f64 / dt,
+            tx as f64 / dt,
+        )
+    };
+    let (gpu, gpu_temp) = gpu_stats();
+    Ok(Stats { cpu, ram_used, ram_total, gpu, gpu_temp, down, up })
+}
+
+/// A Windows toast (used when the focus timer ends while Fay is hidden).
+#[tauri::command]
+async fn notify(title: String, body: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let esc = |s: &str| {
+            s.replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+                .replace('\'', "&apos;")
+                .replace('`', "``")
+                .replace('$', "`$")
+        };
+        let (t, b) = (esc(&title), esc(&body));
+        // PowerShell's own AppUserModelId is registered for toasts on every PC.
+        let ps = format!(
+            r#"$aumid='{{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}}\WindowsPowerShell\v1.0\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
+[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
+$xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+$xml.LoadXml("<toast><visual><binding template='ToastGeneric'><text>{t}</text><text>{b}</text></binding></visual></toast>")
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($aumid).Show([Windows.UI.Notifications.ToastNotification]::new($xml))"#
+        );
+        cmd("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (title, body);
+        Err("notifications are only implemented on Windows".into())
+    }
 }
 
 fn open_commands_folder(app: &tauri::AppHandle) {
@@ -1061,6 +1186,11 @@ fn set_mouse_summon(spec: Option<String>) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .manage(HotkeyState::default())
+        .manage(StatsMutex::new(StatsState {
+            sys: sysinfo::System::new(),
+            nets: sysinfo::Networks::new_with_refreshed_list(),
+            last: std::time::Instant::now(),
+        }))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -1116,9 +1246,12 @@ fn main() {
             fire,
             set_clipboard,
             set_summon_monitor,
-            list_commands
+            list_commands,
+            get_stats,
+            notify
         ])
         .setup(|app| {
+            let _ = APP.set(app.handle().clone());
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
             // The frontend may override it from config via set_summon_hotkey.
             use tauri_plugin_global_shortcut::{Code, Modifiers};

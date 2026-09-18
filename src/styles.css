@@ -177,6 +177,13 @@ body.in-folder .group--folder { display: flex; }
 }
 #status.is-flash { color: var(--accent); }
 #status.is-warn { color: #ffcf6b; }
+.foot > span { flex: 1; }
+.foot > span:last-child { text-align: right; }
+.timer { text-align: center; color: var(--accent); text-shadow: 0 0 10px var(--accent); }
+
+/* a running focus tile */
+.tile.is-active { border-color: var(--accent); box-shadow: 0 0 24px -6px var(--accent); }
+.tile.is-active .tile__name::after { content: " · stop"; color: var(--dim); font-size: 10px; }
 
 @media (prefers-reduced-motion: reduce) {
   .deck { transition: none; }

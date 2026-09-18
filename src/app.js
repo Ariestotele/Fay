@@ -15,6 +15,7 @@ const els = {
   core: document.getElementById("core"),
   canvas: document.getElementById("heart"),
   filter: document.getElementById("filter"),
+  timer: document.getElementById("timer"),
 };
 
 const tauri = window.__TAURI__ || null;
@@ -29,7 +30,8 @@ const invoke =
 // multi:   actions = [ step, {"wait": ms}, … ] run in order (any kind per step)
 // close:   closes = ["Discord", "zen!"] processes to close ("!" = force)
 // folder:  children = [ tiles… ] opens a sub-deck
-const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder"]);
+// focus:   minutes = N starts the focus timer (action "stop" / "toggle")
+const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder", "focus"]);
 const SYSTEM_ACTIONS = new Set(["lock", "sleep", "hibernate", "restart", "shutdown", "logoff", "recycle", "darkmode"]);
 const MEDIA_ACTIONS = new Set(["playpause", "play", "pause", "next", "prev", "previous", "stop", "mute", "volup", "voldown"]);
 const CONFIRM_ACTIONS = new Set(["restart", "shutdown", "logoff", "hibernate"]);
@@ -61,6 +63,7 @@ function actionOf(item, query) {
     steps: kind === "multi" ? item.actions.map(stepOf) : [],
     wait: item.wait != null ? Number(item.wait) : null,
     closes: kind === "close" && canClose(item) ? item.closes.map(String) : [],
+    minutes: item.minutes != null ? Number(item.minutes) : null,
   };
 }
 const stepOf = (s) => (s && s.wait != null && !s.kind && !s.target ? { kind: "wait", wait: Number(s.wait) } : actionOf(s || {}));
@@ -81,9 +84,76 @@ function walkTiles(cfg, fn) {
 function allTiles(cfg) { const out = []; walkTiles(cfg, (t) => out.push(t)); return out; }
 
 // ---- open / rest state ----------------------------------------------------
-function openDeck() { document.body.classList.add("open"); refreshRunning(); }
-function closeDeck() { document.body.classList.remove("open"); leaveFolders(); setFilter(""); }
+function openDeck() { document.body.classList.add("open"); refreshRunning(); heartStats(false); }
+function closeDeck() { document.body.classList.remove("open"); leaveFolders(); setFilter(""); heartStats(true); }
 function isOpen() { return document.body.classList.contains("open"); }
+const heartStats = (v) => { if (window.Heart) window.Heart.setStatsVisible(v); };
+
+// ---- live stats (drawn by the Heart at rest) ------------------------------
+// Polled only while Fay is in front; hidden behind the open deck.
+function startStats(app) {
+  if (!invoke || app.stats === false || !window.Heart) return;
+  const every = Math.max(1000, Number(app.statsInterval) || 2500);
+  const tick = async () => {
+    if (!document.hasFocus()) return;
+    try { window.Heart.setStats(await invoke("get_stats")); } catch (e) { /* non-fatal */ }
+  };
+  tick();
+  setInterval(tick, every);
+  window.addEventListener("focus", tick);
+}
+
+// ---- focus timer ----------------------------------------------------------
+const focus = { end: 0, total: 0, timer: null, label: "" };
+function focusStart(minutes, label) {
+  focus.total = minutes * 60000;
+  focus.end = Date.now() + focus.total;
+  focus.label = label || `Focus ${minutes}`;
+  clearInterval(focus.timer);
+  focus.timer = setInterval(focusTick, 1000);
+  focusTick();
+  flash(`${focus.label} — ${minutes} min`);
+  markFocusTiles();
+}
+function focusStop(done) {
+  clearInterval(focus.timer);
+  focus.timer = null;
+  focus.end = 0;
+  els.timer.textContent = "";
+  if (window.Heart) window.Heart.setProgress(null);
+  if (done) {
+    flash(`${focus.label} done`);
+    if (window.Heart) window.Heart.pulse();
+    if (invoke) invoke("notify", { title: "Fay", body: `${focus.label} — time's up` }).catch(() => {});
+    if (window.__faySay) window.__faySay(`${focus.label} complete`);
+  }
+  markFocusTiles();
+}
+function focusTick() {
+  const left = focus.end - Date.now();
+  if (left <= 0) { focusStop(true); return; }
+  const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+  els.timer.textContent = `◔ ${focus.label} ${m}:${String(s).padStart(2, "0")}`;
+  if (window.Heart) window.Heart.setProgress(1 - left / focus.total);
+}
+const focusRunning = () => !!focus.timer;
+function markFocusTiles() {
+  for (const t of document.querySelectorAll(".tile--k-focus")) {
+    const it = t._item || {};
+    t.classList.toggle("is-active", focusRunning() && it.minutes > 0);
+  }
+}
+// Entry point for hotkeys (the backend evals this) and tiles.
+window.__fayFocus = (minutes, action) => {
+  if (action === "stop") focusStop(false);
+  else if (action === "toggle" && focusRunning()) focusStop(false);
+  else if (minutes > 0) focusStart(Number(minutes));
+};
+function fireFocus(item) {
+  if (item.action === "stop") { focusStop(false); return; }
+  if (focusRunning() && item.minutes > 0 && (item.action === "toggle" || item.action == null)) { focusStop(false); return; }
+  if (item.minutes > 0) focusStart(Number(item.minutes), item.name);
+}
 
 // ---- folders (sub-decks) --------------------------------------------------
 const folderStack = [];
@@ -326,6 +396,7 @@ const warn = (m) => { console.warn(m); setStatus(m, "is-warn", 9000); };
 async function fire(item, query) {
   const kind = kindOf(item);
   if (kind === "folder") { openFolder(item); return; }
+  if (kind === "focus") { fireFocus(item); return; }
   if (kind === "launch" && !item.target) return;
   const payload = actionOf(item, query);
   await send(payload, `→ ${item.name}${query ? ` ▸ ${query.trim()}` : ""}${item.elevated ? " (admin)" : ""}`, item.name);
@@ -635,6 +706,7 @@ function validateConfig(cfg, packs) {
     if (k === "media" && !MEDIA_ACTIONS.has(t.action)) p.push(`${who}: media action must be one of playpause/next/prev/stop/mute/volup/voldown`);
     if (k === "snippet" && typeof t.text !== "string") p.push(`${who} needs "text"`);
     if (k === "close" && !canClose(t)) p.push(`${who} needs "closes": ["process", …]`);
+    if (k === "focus" && !(t.minutes > 0) && t.action !== "stop") p.push(`${who} needs "minutes": 25 (or "action": "stop")`);
     if (k === "multi") {
       if (!t.actions.length) p.push(`${who}: "actions" is empty`);
       t.actions.forEach((s, i) => {
@@ -746,6 +818,7 @@ async function main() {
     if (typeof app.autostart === "boolean" && invoke) {
       invoke("set_autostart", { enabled: app.autostart }).catch((e) => warn(`autostart: ${e}`));
     }
+    startStats(app);
 
     (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
     (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
