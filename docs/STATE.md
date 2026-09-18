@@ -46,6 +46,7 @@ the workflows now clear old bundles before building.)
 | 22 | **Batch 6 / AI + picker** — natural-language bar (Enter on no-match or `?`), JSON plan → `TileAction` multi, bounded retry loop, destructive gate; screen-aware ask (`kind: "ask"`, `Ctrl+Alt+A`, capture-before-show); Anthropic or Ollama (`app.ai`); `+ Add app` picker (`pick_file`, `addTile`); debug round 2 (`-EncodedCommand`, history normalization, confirm gates) |
 | 23 | **Debug round 3 / first real render** — `docs/render-preview.js` screenshots the real frontend in headless Chromium; fixed the Heart drawn at ¼ size, `accent: "auto"` parsing as black, a duplicate tile id, and deck overflow (hint clamp, scrolling deck). `docs/ui-preview.png` + `ui-deck.png` are real renders now |
 | 24 | **Heart polish (owner-approved variant B + extras)** — soft halo under both bands, tighter band cores, brighter sphere core with bloom, clock tucked into the sphere's rim, wordmark at half opacity, quieter tile borders/glass so the Heart reads through the deck |
+| 25 | **Debug round 4 / frontend flow tests** — `docs/test-frontend.js` (34 checks in headless Chromium) runs in CI's `config` job; its first run found and fixed `@` being eaten by the Shift+digit teardown → teardown is now **Ctrl+digit**, digit shortcuts key off `e.key` (in PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 

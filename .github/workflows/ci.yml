@@ -33,6 +33,13 @@ jobs:
         run: |
           node -c src/app.js
           node -c src/heart.js
+      # Drive the real UI (preview mode) through its keyboard flows in headless
+      # Chrome: filter, calculator, quicklinks, folders, results/ask modes,
+      # focus timer, teardown. Exits 1 on any FAIL.
+      - name: Frontend flow tests
+        run: |
+          npm install --no-save --silent playwright-core
+          CHROME="$(which google-chrome || which chromium-browser || which chromium)" node docs/test-frontend.js
 
   # Real build verification: compile the Tauri app on Windows.
   build-check:

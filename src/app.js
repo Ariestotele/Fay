@@ -801,7 +801,7 @@ async function fire(item, query) {
   if (payload.say && window.Heart) window.Heart.talk(400 + payload.say.length * 65);
 }
 
-// Scene teardown: close the processes listed in `closes` (Shift+click / Shift+digit / ×).
+// Scene teardown: close the processes listed in `closes` (Shift+click / Ctrl+digit / Shift+Enter / ×).
 async function fireClose(item) {
   if (!canClose(item)) return;
   await send(closeActionOf(item), `× ${item.name}`, item.name);
@@ -1002,11 +1002,14 @@ function wireInput() {
     }
     // Digits fire tiles only while nothing is typed; once the filter has text
     // (or starts with "=") they are part of it, so "= 1440*0.62" works.
-    // Shift+digit on a scene with `closes` tears it down instead.
-    if (/^[1-9!@#$%^&*(]$/.test(e.key) && plain && !filterText) {
-      const n = /^[1-9]$/.test(e.key) ? Number(e.key) : ")!@#$%^&*(".indexOf(e.key);
-      const t = visibleTiles()[n - 1];
-      if (t) fireEl(t, e.shiftKey);
+    // Ctrl+digit on a scene with `closes` tears it down instead. (Not Shift:
+    // Shift+2 is "@", the bookmark-search prefix, on US layouts.)
+    // Use the produced character, not the physical key: Shift/AltGr+digit
+    // yields symbols ("@", "€") that must type, whatever the layout.
+    const digit = /^[1-9]$/.test(e.key) ? Number(e.key) : 0;
+    if (digit && !filterText && !e.altKey && !e.metaKey && !e.shiftKey) {
+      const t = visibleTiles()[digit - 1];
+      if (t) fireEl(t, e.ctrlKey);
       e.preventDefault();
       return;
     }

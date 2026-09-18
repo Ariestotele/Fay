@@ -399,3 +399,14 @@ and brighter inner particles give the sphere a core so it reads as the
 button, the clock sits in the sphere's lower rim, and the wordmark drops to
 half opacity. Process decision reaffirmed: design choices are made on
 rendered screenshots of the real frontend, one render per tweak.
+
+### 2026-09-18 — Debug round 4: automated frontend flow tests
+`docs/test-frontend.js` drives the real UI in headless Chromium (preview
+mode, no Tauri) through 34 checks — filter, calculator, conversion, quicklinks,
+folders, confirm-arming, results/ask modes, focus timer, teardown — and now
+runs in CI's `config` job on every push. Its first run caught a real bug:
+typing `@` (Shift+2 on US layouts) fired the Shift+digit scene teardown
+instead of starting bookmark search. Teardown moved to **Ctrl+digit**, and
+digit shortcuts key off the produced character (`e.key`), never the physical
+key, so Shift/AltGr symbols always type. Principle: any UI-touching change
+must keep this suite green; add a check when adding a flow.
