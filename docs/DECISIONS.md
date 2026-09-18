@@ -410,3 +410,22 @@ instead of starting bookmark search. Teardown moved to **Ctrl+digit**, and
 digit shortcuts key off the produced character (`e.key`), never the physical
 key, so Shift/AltGr symbols always type. Principle: any UI-touching change
 must keep this suite green; add a check when adding a flow.
+
+### 2026-09-18 — Debug round 5: backend-contract tests + Rust unit tests
+Two seams the flow tests couldn't reach now have coverage. (1)
+`docs/test-backend-contract.js` injects a fake `window.__TAURI__` that
+records every `invoke`, then asserts what the UI *sends* to Rust: startup
+calls (hotkeys, mouse summon, clipboard watcher, voice grammar — which must
+exclude shutdown-class tiles — AI config), hotkey bindings by kind, the exact
+`fire` payloads for a scene, a Ctrl+digit teardown, a multi-action, a snippet
+(hide first), a quicklink (URL-encoded query), clipboard pick order, file
+search + reveal, and the AI plan → multi mapping including the destructive
+gate (unconfirmed shutdown is dropped; the user's own "yes, shut down" lets
+it through). (2) A `#[cfg(test)]` module in `main.rs` covers the pure helpers
+— `expand_env`, `url_encode`, base64 round-trip, the UTF-16LE encoded-command
+form, mozlz4 bookmark parsing (built with `lz4_flex::compress`), Chromium
+bookmark walking, `TileAction` camelCase/flatten deserialization, and
+`perform` semantics for `multi` (stops at the first failing step, names it)
+and `wait`. `cargo test` runs on the Windows CI job because the crate needs
+GTK to build on Linux. Both suites are green; no new product bugs surfaced,
+which is the point — the previous round's `@` bug was the kind these catch.
