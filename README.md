@@ -105,4 +105,4 @@ The project's working memory is in `docs/`: **STATE.md** (what's done / next),
 
 ## Status
 
-Fourteen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
+Sixteen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
