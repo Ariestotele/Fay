@@ -12,6 +12,10 @@ Every push to `main` builds a Windows installer automatically:
 That's it — no Rust or Node needed. Use the sections below only if you want to
 develop or run from source.
 
+**Even easier:** tagged versions are published on the **Releases** page with the
+installer attached — https://github.com/Ariestotele/Fay/releases — no need to
+open the Actions tab at all.
+
 ## Where your config lives (installed build)
 
 The installer bakes a **default** `apps.config.json` into the app. On first run
@@ -162,6 +166,13 @@ For each: open the Workspaces editor, arrange the windows, **Save**, then
 **Create desktop shortcut**. Rename the shortcut to match the config
 (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`) or edit the tile `target` to
 whatever PowerToys named it.
+
+## Keyboard (when the deck is open)
+
+- **1–9** — fire the tile with that number (the first nine visible tiles are numbered).
+- **Type** — just start typing to filter tiles by name; **Enter** fires the first match.
+- **Backspace** edits the filter; **Esc** clears it (press again to close the deck).
+- **Arrows** move focus between tiles; **Enter** fires the focused one.
 
 ## Direct hotkeys — fire a scene or app without opening Fay
 

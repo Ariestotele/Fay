@@ -160,3 +160,19 @@ Three fixes so the installer build is actually usable day-to-day:
 3. **Visible failures.** A `warn()` status (amber, 7s) in the footer surfaces
    hotkey-bind failures, missing SoundVolumeView, config typos, etc. On a config
    error the window is shown so the message can be seen.
+
+### 2026-09-18 — Phase 10: number-key launch + type-to-filter
+With the deck open, digits 1–9 fire the Nth visible tile (tiles are numbered
+inline before the name) and typing filters tiles by name (substring, case-
+insensitive) with Enter firing the first match; Esc clears the filter before it
+closes the deck. Frontend-only. Digits are excluded from the filter text so the
+two never conflict. Keeps the deck keyboard-fast as it grows, ahead of a full
+search/categories feature.
+
+### 2026-09-18 — Phase 11: GitHub Releases on tag
+A `release.yml` workflow runs on `v*` tags: builds the NSIS installer and
+publishes a GitHub Release (softprops/action-gh-release, auto-generated notes)
+with the `.exe` attached. Gives the owner a clean, permanent download page
+instead of Actions artifacts (which expire). Per-push artifacts stay for testing
+in-between. Workflow needs `contents: write`. Versions come from the existing
+`0.1.0` in tauri.conf/Cargo/package; first tag is `v0.1.0`.
