@@ -1,6 +1,6 @@
 [package]
 name = "fay"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fay — a minimal dark desktop launcher hub."
 edition = "2021"
 
