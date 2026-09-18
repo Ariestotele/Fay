@@ -315,7 +315,7 @@ Manager's *Details* tab without `.exe`:
   "closes": ["Discord", "zen", "Taskmgr"], "closeHotkey": "Ctrl+Alt+Shift+2" }
 ```
 
-Then **Shift+click** the tile (or **Shift+digit**, **Shift+Enter**, or the
+Then **Shift+click** the tile (or **Ctrl+digit**, **Shift+Enter**, or the
 **×** that appears on hover) to close them. Windows asks each app to close
 politely; add `!` to force one (`"Discord!"`) — note Discord's default "close
 to tray" means a polite close only hides it. Apps that weren't running are
