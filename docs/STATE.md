@@ -3,10 +3,10 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** Phases 1–9 merged to `main` (all CI-green). **Phases 10–11
-(keyboard launch/filter + Release workflow) in PR.** The Phase 9 merge's
-installer is the first build the owner should install. Build-day queue in
-progress (see Pipeline).
+**Current phase:** Phases 1–14 merged to `main` (all CI-green). **v0.1.0 is
+published on the Releases page** (`Fay_0.1.0_x64-setup.exe`). Phase 15 (README)
+in PR; Phase 16 (Ctrl+Mouse5) code written, next PR. Owner has not yet
+runtime-tested — install v0.1.0 (or any newer CI artifact) and report.
 
 ## ✅ Done (all merged)
 
@@ -28,7 +28,8 @@ progress (see Pipeline).
 | 13 | Running-app indicator — `list_running` + per-tile process-name guess (`process` override); glowing dot; polled only while open (in PR) |
 | 14 | Per-machine profiles — `machines.<HOST>.tiles.<id>` overlay merged onto tiles; `get_hostname`; host shown in footer (next PR) |
 | — | **Debug round** — no console flashes (`CREATE_NO_WINDOW`), blocking commands made `async` (no UI freeze), Heart idle while hidden, HiDPI-crisp canvas, no runaway polling, broken-config fallback (in PR) |
-| 15 | README rewritten as the product front door — preview, 30-second install, feature table, full config reference (next PR) |
+| 15 | README rewritten as the product front door — preview, 30-second install, feature table, full config reference (in PR) |
+| 16 | Ctrl+Mouse5 summon — `app.mouseSummon`, WH_MOUSE_LL hook thread (`windows-sys`), swallows the click; `set_mouse_summon` (next PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -40,8 +41,9 @@ progress (see Pipeline).
 
 ## 📌 Pending — owner tasks (can't be automated)
 
-- [ ] **Run Fay** (install the CI artifact from the Phase 9 merge) and give
-      feedback on the Heart — density, pulse, backdrop dimness, ball size, tile layout.
+- [ ] **Run Fay** — install **v0.1.0 from the Releases page** (or any newer CI
+      artifact) and give feedback on the Heart — density, pulse, backdrop
+      dimness, ball size, tile layout — and whether Ctrl+Mouse5 works.
 - [ ] Verify the exe paths for **Zen / Claude / LifeOS** — edit via tray › *Open
       config file* (`%APPDATA%\com.fay.hub\apps.config.json`), then *Reload config*.
 - [ ] Create the three **PowerToys Workspaces** + desktop shortcuts
@@ -54,7 +56,7 @@ progress (see Pipeline).
 
 | Feature | Value | Notes |
 | :-- | :-- | :-- |
-| Ctrl+Mouse5 summon | med | native low-level mouse hook — **next**, last in the queue; owner tests via installer |
+| *(build-day queue complete after Phase 16)* | | Next candidates, owner's pick: search + categories (deck > ~20 tiles), config validation with line numbers, cursor-monitor summon (show on the monitor under the cursor), code signing to silence SmartScreen |
 | Per-machine profiles | med | different paths per PC; fixes absolute-path portability |
 | Running-app indicator | med | dot on apps already open |
 | First-run path picker | med | "browse…" to capture exe paths |

@@ -489,6 +489,133 @@ fn get_hostname() -> String {
         .to_uppercase()
 }
 
+/// Mouse-button summon (e.g. Ctrl+Mouse5). The global-shortcut plugin is
+/// keyboard-only, so this runs a WH_MOUSE_LL hook on its own thread and toggles
+/// the window when the configured button+modifiers are pressed. The matching
+/// click is swallowed so the app under the cursor doesn't also act on it.
+#[cfg(target_os = "windows")]
+mod mouse_summon {
+    use std::sync::{Mutex, OnceLock};
+    use tauri::Manager;
+    use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, VK_CONTROL, VK_MENU, VK_SHIFT,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, GetMessageW, SetWindowsHookExW, MSG, MSLLHOOKSTRUCT, WH_MOUSE_LL,
+        WM_XBUTTONDOWN,
+    };
+
+    #[derive(Clone, Copy)]
+    pub struct Combo {
+        pub ctrl: bool,
+        pub alt: bool,
+        pub shift: bool,
+        /// XBUTTON1 (= "Mouse4", back) is 1, XBUTTON2 (= "Mouse5", forward) is 2.
+        pub xbutton: u16,
+    }
+
+    static COMBO: Mutex<Option<Combo>> = Mutex::new(None);
+    static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+
+    /// Parse "Ctrl+Mouse5", "Alt+Shift+Mouse4", "Mouse5", …
+    pub fn parse(spec: &str) -> Option<Combo> {
+        let mut c = Combo { ctrl: false, alt: false, shift: false, xbutton: 0 };
+        for part in spec.split('+').map(|p| p.trim().to_ascii_lowercase()) {
+            match part.as_str() {
+                "ctrl" | "control" => c.ctrl = true,
+                "alt" => c.alt = true,
+                "shift" => c.shift = true,
+                "mouse4" | "xbutton1" | "back" => c.xbutton = 1,
+                "mouse5" | "xbutton2" | "forward" => c.xbutton = 2,
+                _ => return None,
+            }
+        }
+        if c.xbutton == 0 {
+            None
+        } else {
+            Some(c)
+        }
+    }
+
+    pub fn set(combo: Option<Combo>) {
+        if let Ok(mut g) = COMBO.lock() {
+            *g = combo;
+        }
+    }
+
+    fn key_down(vk: u16) -> bool {
+        unsafe { (GetAsyncKeyState(vk as i32) as u16 & 0x8000) != 0 }
+    }
+
+    unsafe extern "system" fn hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code >= 0 && wparam as u32 == WM_XBUTTONDOWN {
+            let info = &*(lparam as *const MSLLHOOKSTRUCT);
+            let xb = ((info.mouseData >> 16) & 0xffff) as u16;
+            let combo = COMBO.lock().ok().and_then(|g| *g);
+            if let Some(c) = combo {
+                if xb == c.xbutton
+                    && key_down(VK_CONTROL) == c.ctrl
+                    && key_down(VK_MENU) == c.alt
+                    && key_down(VK_SHIFT) == c.shift
+                {
+                    if let Some(app) = APP.get() {
+                        let app = app.clone();
+                        let inner = app.clone();
+                        let _ = app.run_on_main_thread(move || {
+                            if let Some(w) = inner.get_webview_window("main") {
+                                super::toggle_window(&w);
+                            }
+                        });
+                    }
+                    return 1;
+                }
+            }
+        }
+        CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
+    }
+
+    /// Install the hook on a dedicated thread (low-level hooks need a message loop).
+    pub fn install(app: tauri::AppHandle) {
+        let _ = APP.set(app);
+        std::thread::spawn(|| unsafe {
+            let h = SetWindowsHookExW(WH_MOUSE_LL, Some(hook), std::ptr::null_mut(), 0);
+            if h.is_null() {
+                eprintln!("mouse summon: hook failed");
+                return;
+            }
+            let mut msg: MSG = std::mem::zeroed();
+            while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {}
+        });
+    }
+}
+
+/// Bind a mouse-button summon combo such as "Ctrl+Mouse5"; empty clears it.
+#[tauri::command]
+fn set_mouse_summon(spec: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        match spec.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            None => {
+                mouse_summon::set(None);
+                Ok(())
+            }
+            Some(s) => match mouse_summon::parse(s) {
+                Some(c) => {
+                    mouse_summon::set(Some(c));
+                    Ok(())
+                }
+                None => Err(format!("bad mouse summon '{s}' (use e.g. Ctrl+Mouse5)")),
+            },
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = spec;
+        Err("mouse summon is only available on Windows".into())
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(HotkeyState::default())
@@ -545,7 +672,8 @@ fn main() {
             show_window,
             get_app_icon,
             list_running,
-            get_hostname
+            get_hostname,
+            set_mouse_summon
         ])
         .setup(|app| {
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
@@ -614,6 +742,10 @@ fn main() {
             if let Some(w) = app.get_webview_window("main") {
                 fill_active_monitor(&w);
             }
+
+            // Mouse-button summon hook (armed by the frontend from config).
+            #[cfg(target_os = "windows")]
+            mouse_summon::install(app.handle().clone());
 
             Ok(())
         })

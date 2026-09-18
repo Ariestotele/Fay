@@ -292,6 +292,10 @@ async function main() {
     if (app.hotkey && invoke) {
       invoke("set_summon_hotkey", { accelerator: app.hotkey }).catch((e) => warn(`summon hotkey: ${e}`));
     }
+    // Mouse-button summon (e.g. "Ctrl+Mouse5"); an empty/absent value leaves it off.
+    if (invoke && "mouseSummon" in app) {
+      invoke("set_mouse_summon", { spec: app.mouseSummon || null }).catch((e) => warn(`mouse summon: ${e}`));
+    }
     if (typeof app.autostart === "boolean" && invoke) {
       invoke("set_autostart", { enabled: app.autostart }).catch((e) => warn(`autostart: ${e}`));
     }
