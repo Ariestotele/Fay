@@ -16,10 +16,10 @@
   let talkUntil = 0, listenUntil = 0; // voice: speaking wobble / listening breath
 
   function hexToRgb(h) {
-    h = (h || "").replace("#", "");
+    h = String(h || "").trim().replace("#", "");
     if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+    if (!/^[0-9a-f]{6}$/i.test(h)) return { r: 52, g: 230, b: 198 }; // strict: "auto" must not parse as 0x0a
     const n = parseInt(h, 16);
-    if (isNaN(n)) return { r: 52, g: 230, b: 198 };
     return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
   }
   function lighten(c, f) {
@@ -38,20 +38,22 @@
         const off = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
         rings.push({
           a: Math.random() * Math.PI * 2, off, rFrac, thFrac, amp, k, speed, bright,
-          sz: 0.4 + Math.random() * 1.2, b: Math.random(), lite: Math.random() < 0.16,
+          sz: 0.7 + Math.random() * 1.5, b: Math.random(), lite: Math.random() < 0.16,
         });
       }
     };
+    // Radii are fractions of R (= 34% of the shorter screen side), matching the
+    // approved mockup: main band at ~R, inner set at ~0.7 R, sphere at 0.17 R.
     // main band — 5 stacked layers, different speeds/directions
-    ring(0.235, 0.024, 360, 0.035, 7, 0.05, 0.9);
-    ring(0.245, 0.026, 420, 0.045, 9, 0.085, 1.0);
-    ring(0.255, 0.022, 360, 0.030, 12, -0.06, 0.7);
-    ring(0.240, 0.020, 320, 0.040, 6, 0.105, 0.8);
-    ring(0.252, 0.018, 320, 0.050, 10, -0.09, 0.65);
+    ring(0.94, 0.07, 360, 0.035, 7, 0.05, 0.9);
+    ring(0.98, 0.08, 420, 0.045, 9, 0.085, 1.0);
+    ring(1.02, 0.065, 360, 0.030, 12, -0.06, 0.7);
+    ring(0.96, 0.06, 320, 0.040, 6, 0.105, 0.8);
+    ring(1.00, 0.055, 320, 0.050, 10, -0.09, 0.65);
     // inner set — offset inward, lighter density
-    ring(0.175, 0.014, 300, 0.05, 8, 0.12, 0.6);
-    ring(0.190, 0.014, 300, 0.04, 11, -0.10, 0.55);
-    ring(0.165, 0.012, 230, 0.06, 6, 0.14, 0.5);
+    ring(0.70, 0.045, 300, 0.05, 8, 0.12, 0.6);
+    ring(0.76, 0.045, 300, 0.04, 11, -0.10, 0.55);
+    ring(0.66, 0.04, 230, 0.06, 6, 0.14, 0.5);
     // particle sphere ball (volumetric)
     for (let i = 0; i < 1500; i++) {
       sphere.push({
@@ -97,7 +99,7 @@
         : null,
       ["NET", `↓${rate(stats.down)} ↑${rate(stats.up)}`, Math.min(1, (stats.down + stats.up) / 12.5e6)],
     ].filter(Boolean);
-    const rad = R * 0.44;
+    const rad = R * 1.22;
     const angles = [-135, -45, 135, 45].map((d) => (d * Math.PI) / 180);
     ctx.font = "11px 'JetBrains Mono', 'Cascadia Code', Consolas, monospace";
     ctx.textBaseline = "middle";
@@ -105,11 +107,14 @@
       const a = angles[i];
       const x = cx + rad * Math.cos(a), y = cy + rad * Math.sin(a);
       const left = Math.cos(a) < 0;
-      ctx.textAlign = left ? "right" : "left";
-      ctx.fillStyle = col(accent, 0.55);
-      ctx.fillText(it[0], x, y - 7);
-      ctx.fillStyle = col(light, 0.9);
-      ctx.fillText(it[1], x + (left ? -30 : 30), y - 7);
+      // "CPU 23%" reads left→right on both sides; the block hangs away from the rings.
+      const label = it[0] + " ", lw = ctx.measureText(label).width, vw = ctx.measureText(it[1]).width;
+      const x0 = left ? x - lw - vw : x;
+      ctx.textAlign = "left";
+      ctx.fillStyle = col(accent, 0.6);
+      ctx.fillText(label, x0, y - 7);
+      ctx.fillStyle = col(light, 0.92);
+      ctx.fillText(it[1], x0 + lw, y - 7);
       const n = 16, filled = Math.round(Math.max(0, Math.min(1, it[2])) * n);
       for (let k = 0; k < n; k++) {
         const dx = (k * 5 + 2) * (left ? -1 : 1);
@@ -121,7 +126,7 @@
 
   // Focus timer: a dotted arc just outside the main ring fills clockwise.
   function drawProgress() {
-    const n = 140, rr = R * 0.315;
+    const n = 220, rr = R * 1.12;
     for (let k = 0; k < n; k++) {
       const f = k / n;
       const a = -Math.PI / 2 + f * Math.PI * 2;

@@ -370,3 +370,20 @@ with folder children ids — dedupe is now deep; (5) every multi-line
 PowerShell script is passed as `-EncodedCommand` (UTF-16LE base64) instead of
 `-Command`, removing the `"`/`$`/backtick quoting risk that the toast, voice,
 capture and picker scripts carried; `-STA` goes before it for the dialog.
+
+### 2026-09-18 — Debug round 3: the first real render of the Heart
+Rendering `src/` in headless Chromium (`docs/render-preview.js`, uses the
+Playwright Chromium bundled in the dev environment) replaced the SVG mockup
+and exposed four things static review missed: (1) the rings were drawn at a
+quarter of the approved size — `rFrac` values were fractions of a radius that
+was itself already 34 % of the screen — so the whole Heart was a small blob;
+radii now follow the mockup (main band ≈ R, inner ≈ 0.7 R, sphere 0.17 R,
+focus arc 1.12 R, stats at 1.22 R); (2) `accent: "auto"` outside Tauri (and
+on any failed registry read) parsed as `0x0a` → near-black; accent is now
+validated as a hex color in both `app.js` and `heart.js`; (3) the starter
+config had a duplicate id (`focus` scene vs `focus` timer tile); (4) long
+hints made tiles tall and the deck overflowed a 900 px screen — hints clamp
+to two lines (full on hover), the deck scrolls within the viewport, and
+groups whose tiles are all filtered out hide their label. `docs/ui-preview.png`
+is now the real render, not a mockup. Lesson recorded: a screenshot of the
+real frontend is cheap here and should be part of every UI-touching PR.
