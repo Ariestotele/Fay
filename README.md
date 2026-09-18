@@ -1,38 +1,107 @@
+<p align="center">
+  <img src="docs/ui-preview.png" alt="Fay — the Heart" width="820">
+</p>
+
 # Fay
 
-> A minimal, dark, techy **command deck** for your Windows desktop.
-> One landing page → open your apps, or snap whole window-layouts across both monitors.
+**A living command deck for your Windows desktop.**
 
-Fay is a personal launcher hub. It does **not** reinvent window management — it
-shows a beautiful grid of tiles, and each tile either launches an app or fires a
-[PowerToys Workspaces](https://learn.microsoft.com/en-us/windows/powertoys/workspaces)
-layout that positions a group of windows exactly where you want them.
+Press a hotkey and a translucent particle *Heart* blooms over your wallpaper,
+tinted to your Windows accent. Click it — or just start typing — to launch apps,
+or fire a whole multi-window **scene** across both monitors. Tauri-based, a few
+megabytes, and completely idle while hidden.
+
+## Install (30 seconds, no toolchain)
+
+1. Download the latest `Fay_…_x64-setup.exe` from **[Releases](https://github.com/Ariestotele/Fay/releases)**.
+2. Run it. Fay starts quietly in the tray.
+   *(SmartScreen may warn — it's unsigned. "More info → Run anyway".)*
+3. Press **Ctrl+Alt+Space**.
+
+Every push to `main` also produces a fresh installer under
+*Actions → latest CI run → Artifacts → `Fay-windows-installer`*.
+
+## What it does
+
+| | |
+| :-- | :-- |
+| **The Heart** | Full-monitor translucent overlay with a canvas particle field: layered multi-speed rings and a pulsing particle sphere. The sphere is the button. Renders only while summoned. |
+| **Scenes** | One tile launches a whole window layout across both screens (via a [PowerToys Workspaces](https://learn.microsoft.com/windows/powertoys/workspaces) shortcut), and can switch your audio output as it does. |
+| **Direct hotkeys** | `Ctrl+Alt+1/2/3` fire scenes without even opening Fay. Any tile can have one. |
+| **Keyboard-fast** | Deck open: `1–9` fires a tile, typing filters, `Enter` fires the first match, `Esc` backs out. |
+| **Real icons** | Each tile shows its app's actual icon, extracted and cached automatically. |
+| **Running dot** | Apps already open get a glowing dot, so a scene doesn't relaunch them by surprise. |
+| **Accent auto** | Colors follow your Windows accent color (or pin a hex). |
+| **Discord-safe audio** | Scenes switch the *Console/Multimedia* default device only — Discord stays where it is. |
+| **Yours, per machine** | One config, with per-PC path overrides keyed by computer name. |
+| **Editable after install** | Config lives in `%APPDATA%`; tray › *Open config file* / *Reload config*. No rebuild. |
+
+## Configure
+
+Tray › **Open config file** opens `%APPDATA%\com.fay.hub\apps.config.json` in
+Notepad. Save, then tray › **Reload config**.
+
+```json
+{
+  "app": {
+    "hotkey": "Ctrl+Alt+Space", "accent": "auto", "backdrop": 0.62,
+    "startHidden": true, "autostart": false
+  },
+  "scenes": [
+    { "id": "game", "name": "Game", "glyph": "◈", "hotkey": "Ctrl+Alt+2",
+      "target": "%USERPROFILE%\\Desktop\\Fay-Game.lnk",
+      "audioOut": "Hyper X Cloud 3 Wireless (HyperX Cloud III Wireless)" }
+  ],
+  "apps": [
+    { "id": "zen",   "name": "Zen",   "glyph": "◯", "target": "%LOCALAPPDATA%\\Programs\\zen\\zen.exe" },
+    { "id": "steam", "name": "Steam", "glyph": "▸", "target": "steam://open/main" }
+  ],
+  "machines": {
+    "DESKTOP-GAMING": { "tiles": { "zen": { "target": "D:\\Apps\\Zen\\zen.exe" } } }
+  }
+}
+```
+
+### Reference
+
+| Key | On | Meaning |
+| :-- | :-- | :-- |
+| `hotkey` | `app` | Summon combo. Keyboard only (`Ctrl`, `Alt`, `Shift`, `Super`, `CmdOrCtrl` + key). |
+| `accent` | `app` | `"auto"` = follow Windows accent, or a `#rrggbb`. |
+| `backdrop` | `app` | 0–1, how much the wallpaper is dimmed behind the Heart. |
+| `startHidden` | `app` | Start in the tray (default `true`). |
+| `autostart` | `app` | Launch Fay at login. |
+| `target` | tile | An exe path, a command on PATH, a `.lnk`, or a URL / protocol (`steam://`, `ms-phone:`). `%ENV%` vars expand. |
+| `hotkey` | tile | Fire this tile globally, without opening Fay. |
+| `audioOut` | tile | Switch the default playback device first (needs [SoundVolumeView](https://www.nirsoft.net/utils/sound_volume_view.html) on PATH). |
+| `elevated` | tile | Run as administrator (UAC prompt). |
+| `process` | tile | Override the process name used for the running dot. |
+| `icon` | tile | Override the extracted icon with a URL / data URL. |
+| `hint` | tile | Small caption under the name. |
+| `machines` | root | `{"<COMPUTERNAME>": {"tiles": {"<id>": {…overrides}}}}`. |
+
+## Scenes in three steps
+
+1. Open the PowerToys **Workspaces** editor, arrange your windows across your monitors, save.
+2. **Create desktop shortcut** for it.
+3. Point a scene's `target` at that `.lnk`. Done — click the tile or press its hotkey.
+
+Full setup, caveats and troubleshooting: **[docs/SETUP.md](docs/SETUP.md)**.
+
+## Develop
 
 ```
-┌──────────────────────────────────────────────┐
-│  FAY · command deck                           │
-│                                               │
-│   ▞ Work      ◳ Focus     ⧉ Comms             │   ← scenes (multi-window layouts)
-│                                               │
-│   </> Code   ◯ Browser   ▸_ Term   ▤ Files   │   ← single apps
-│   ♪ Spotify  ✎ Notion                         │
-└──────────────────────────────────────────────┘
+git clone https://github.com/Ariestotele/Fay.git && cd Fay
+npm install
+npm run dev
 ```
 
-## Why it's built this way
+Needs Node.js and Rust. CI compiles the app on Windows and builds an installer
+on every push; a new `version` on `main` publishes a Release automatically.
 
-- **Tauri v2** — tiny (~3MB), low memory, perfect for an always-available hub.
-- **Config-driven** — add apps/scenes by editing one JSON file, no rebuild.
-- **Hybrid positioning** — PowerToys Workspaces does the hard window-snapping;
-  Fay is the pretty front door that triggers it.
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full picture and
-[`docs/DECISIONS.md`](docs/DECISIONS.md) for why each choice was made.
+The project's working memory is in `docs/`: **STATE.md** (what's done / next),
+**ARCHITECTURE.md** (how it's built), **DECISIONS.md** (why, append-only).
 
 ## Status
 
-Early scaffold. See [`docs/STATE.md`](docs/STATE.md) for current progress.
-
-## Quick start
-
-See [`docs/SETUP.md`](docs/SETUP.md).
+Fourteen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
