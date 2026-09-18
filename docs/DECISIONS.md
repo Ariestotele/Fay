@@ -269,3 +269,21 @@ prefix because bare digits fire tiles; currency is deliberately left out
 a syntax error (now reported with line/col), shows the window so the message
 is seen; (9) the overlay opens on the monitor **under the cursor** by default
 (`summonOn`), using `cursor_position` + `monitor_from_point`.
+
+### 2026-09-18 — Phase 18 (batch 2): folders, multi-action, teardown, commands folder
+Folders are **frontend-only**: a tile with `children` swaps the three groups
+for the folder's grid plus a breadcrumb; Esc/Backspace goes up; number keys,
+typing and Enter scope to the visible container. Children are ordinary tiles,
+so their hotkeys and quicklink keywords work from anywhere (all tile walks are
+now recursive). Multi-action tiles reuse `TileAction` recursively (`steps`,
+plus `wait` pauses) so a sequence can mix every kind and run from a hotkey;
+they stop at the first failing step. Scene teardown is a `closes` list of
+process names run through graceful `taskkill /IM` (WM_CLOSE) with a `!` suffix
+to force — chosen over "second press closes" because an active scene isn't
+detectable and a mis-press would kill apps; Shift+click / Shift+digit / a
+hover × / `closeHotkey` are the explicit triggers, and "not running" is a
+footer note rather than an error. The commands folder is
+`<config dir>\commands` (created on first run, tray item to open it); files
+become tiles at load, and `.ps1` targets now run via `powershell -File` with
+Bypass because the .ps1 shell association is "edit". Rust gains `expand_env`
+for paths it hands to PowerShell (cmd.exe expanded `%VAR%` for us before).

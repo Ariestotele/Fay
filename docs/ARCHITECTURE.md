@@ -44,7 +44,12 @@ get_accent_color()        // Windows accent color (#rrggbb) for accent: "auto"
 fire(action)              // perform any tile: launch / system / media / snippet
 set_clipboard(text)       // native CF_UNICODETEXT (calculator "Enter copies")
 set_summon_monitor(mode)  // "cursor" (monitor under the mouse) or "current"
+list_commands(dir?)       // scripts in the commands folder → tiles
 ```
+
+`TileAction` is recursive: `multi` carries `steps` (each a TileAction, or
+`wait`), `close` carries `closes`. Folders are frontend-only (`children`); the
+deck swaps the three groups for the folder's grid and a breadcrumb.
 
 ### Tile kinds (Phase 17)
 

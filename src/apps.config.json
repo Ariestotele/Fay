@@ -27,7 +27,8 @@
       "hotkey": "Ctrl+Alt+2",
       "target": "%USERPROFILE%\\Desktop\\Fay-Game.lnk",
       "audioOut": "Hyper X Cloud 3 Wireless (HyperX Cloud III Wireless)",
-      "hint": "Game on the ASUS main · side screen quartered: Discord, Task Manager, Zen, LifeOS · audio → headset"
+      "closes": ["Discord", "zen", "Taskmgr"],
+      "hint": "Game on the ASUS main · side screen quartered: Discord, Task Manager, Zen, LifeOS · audio → headset · Shift+click closes them"
     },
     {
       "id": "side",
@@ -35,6 +36,7 @@
       "glyph": "⊞",
       "hotkey": "Ctrl+Alt+3",
       "target": "%USERPROFILE%\\Desktop\\Fay-Side.lnk",
+      "closes": ["Discord", "zen", "Taskmgr"],
       "hint": "Side screen only: quarter Discord, Task Manager, Zen, LifeOS"
     }
   ],
@@ -47,9 +49,18 @@
     { "id": "steam",   "name": "Steam",        "glyph": "▸", "target": "steam://open/main" },
     { "id": "taskmgr", "name": "Task Manager", "glyph": "▦", "target": "taskmgr", "hint": "Add \"elevated\": true if you want it to start as admin" },
     { "id": "yt",      "name": "YouTube",      "glyph": "▶", "keyword": "yt", "target": "https://www.youtube.com/results?search_query={query}", "hint": "type: yt lofi ⏎" },
-    { "id": "sig",     "name": "Sign-off",     "glyph": "✎", "kind": "snippet", "text": "Best regards,\n— sent via Fay", "hint": "pastes into the app in front" }
+    { "id": "more",    "name": "More",         "glyph": "▤", "children": [
+      { "id": "sig",     "name": "Sign-off",  "glyph": "✎", "kind": "snippet", "text": "Best regards,\n— sent via Fay", "hint": "pastes into the app in front" },
+      { "id": "g",       "name": "Google",    "glyph": "◎", "keyword": "g",  "target": "https://www.google.com/search?q={query}", "hint": "type: g anything ⏎" },
+      { "id": "gh",      "name": "GitHub",    "glyph": "⌥", "keyword": "gh", "target": "https://github.com/search?q={query}" }
+    ] }
   ],
-  "system": [],
+  "system": [
+    { "id": "winddown", "name": "Wind down", "glyph": "☾", "actions": [
+      { "kind": "media", "action": "playpause" }, { "wait": 400 }, { "kind": "system", "action": "lock" }
+    ], "hint": "pause music, then lock" }
+  ],
   "packs": ["power", "media"],
+  "commands": true,
   "machines": {}
 }

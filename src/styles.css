@@ -72,8 +72,20 @@ body.open .deck { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer
 body.open .core { opacity: 0; pointer-events: none; }
 body.open .clock { opacity: 0; }
 
+.groups { display: flex; flex-direction: column; align-items: center; gap: 24px; }
 .group { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .group:has(.grid:empty) { display: none; }
+
+/* folders: a sub-deck replaces the groups; Esc / Backspace goes back */
+.group--folder { display: none; }
+body.in-folder .groups { display: none; }
+body.in-folder .group--folder { display: flex; }
+.group--folder .group__label { text-transform: none; letter-spacing: 0.2em; color: var(--accent); }
+.group--folder .group__label::before { content: "‹ "; color: var(--dim); }
+.tile--k-folder::after {
+  content: "›"; position: absolute; top: 6px; right: 11px;
+  color: var(--dim); font-size: 14px;
+}
 .group__label {
   font-size: 10px; letter-spacing: 0.42em; text-transform: uppercase; color: var(--dim);
 }
@@ -127,6 +139,16 @@ body.open .clock { opacity: 0; }
 .filter__kw { color: var(--txt); }
 .filter__ans { margin-left: 14px; color: var(--txt); text-shadow: 0 0 12px var(--accent); }
 .filter__hint { margin-left: 14px; font-size: 9.5px; color: var(--dim); letter-spacing: 0.1em; }
+
+/* scene teardown: × appears on hover for tiles with `closes` */
+.tile__close {
+  position: absolute; top: 4px; right: 8px;
+  font-size: 15px; line-height: 1; color: var(--dim);
+  opacity: 0; transition: opacity 0.15s ease, color 0.15s ease;
+  pointer-events: auto;
+}
+.tile:hover .tile__close, .tile:focus-visible .tile__close { opacity: 0.8; }
+.tile__close:hover { color: #ff8c6b; opacity: 1 !important; }
 
 /* destructive tile armed — press again within 3 s */
 .tile.is-confirm { border-color: #ffcf6b; box-shadow: 0 0 24px -6px #ffcf6b; }
