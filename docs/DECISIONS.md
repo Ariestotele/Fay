@@ -176,3 +176,12 @@ with the `.exe` attached. Gives the owner a clean, permanent download page
 instead of Actions artifacts (which expire). Per-push artifacts stay for testing
 in-between. Workflow needs `contents: write`. Versions come from the existing
 `0.1.0` in tauri.conf/Cargo/package; first tag is `v0.1.0`.
+
+### 2026-09-18 — Phase 12: real app icons
+Tiles swap their glyph for the target's actual icon. A `get_app_icon` command
+resolves the target (env vars, `.lnk` via WScript.Shell, PATH commands via
+`Get-Command`), extracts it with `System.Drawing.Icon::ExtractAssociatedIcon`
+in PowerShell, and returns a PNG data URL; results are cached as PNGs in the app
+cache dir keyed by a hash of the target. Protocol targets have no icon and keep
+the glyph. An explicit `icon` on a tile overrides. Base64 is hand-rolled (~40
+lines) rather than adding a crate for one use.

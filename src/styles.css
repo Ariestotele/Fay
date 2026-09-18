@@ -102,6 +102,10 @@ body.open .clock { opacity: 0; }
 }
 .tile:active { transform: translateY(0) scale(0.985); }
 .tile__glyph { color: var(--accent); font-size: 18px; text-shadow: 0 0 12px var(--accent); }
+.tile__icon {
+  display: block; width: 24px; height: 24px; border-radius: 6px;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent));
+}
 .tile__name { font-size: 12.5px; letter-spacing: 0.03em; }
 .tile__idx { color: var(--dim); font-size: 10px; }
 .tile__idx:not(:empty)::after { content: " · "; }

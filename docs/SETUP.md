@@ -167,6 +167,14 @@ For each: open the Workspaces editor, arrange the windows, **Save**, then
 (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`) or edit the tile `target` to
 whatever PowerToys named it.
 
+## App icons
+
+Tiles show the app's **real icon** automatically — Fay extracts it from the
+target (exe, `.lnk` shortcut, or a command on PATH) and caches it. Nothing to
+configure. Protocol targets (`steam://`, `ms-phone:`) have no icon, so those
+tiles keep their glyph. To force a specific image, set `"icon"` on the tile to a
+URL or a `data:` URL.
+
 ## Keyboard (when the deck is open)
 
 - **1–9** — fire the tile with that number (the first nine visible tiles are numbered).

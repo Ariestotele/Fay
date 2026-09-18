@@ -24,6 +24,7 @@ progress (see Pipeline).
 | 9 | Installed-build readiness — user-editable config seeded to `%APPDATA%\com.fay.hub\apps.config.json` (tray: Open config / Reload), starts hidden (`startHidden`), amber `warn()` surfacing in the footer (in PR) |
 | 10 | Number-key launch (1–9) + type-to-filter with Enter-to-fire, Esc clears; frontend only (in PR) |
 | 11 | Release workflow — `v*` tag builds the installer and publishes it on the GitHub Releases page (in PR; first tag `v0.1.0`) |
+| 12 | Real app icons — `get_app_icon` extracts + caches each target's icon; glyph fallback; `icon` override (next PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -49,7 +50,7 @@ progress (see Pipeline).
 
 | Feature | Value | Notes |
 | :-- | :-- | :-- |
-| Real app icons | high | extract each app's icon instead of glyphs — **next** |
+| Running-app indicator | med | dot on apps already open — **next** |
 | Per-machine profiles | med | different paths per PC; fixes absolute-path portability |
 | Running-app indicator | med | dot on apps already open |
 | First-run path picker | med | "browse…" to capture exe paths |

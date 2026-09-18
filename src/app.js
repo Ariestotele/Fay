@@ -93,7 +93,19 @@ function tile(item, kind) {
       ${item.hint ? `<div class="tile__hint">${escapeHtml(item.hint)}</div>` : ""}
     </div>`;
   el.addEventListener("click", () => launch(item));
+  loadIcon(el, item);
   return el;
+}
+
+// Swap the glyph for the app's real icon: an explicit `icon` (URL/data URL)
+// wins; otherwise ask the backend to extract it from the target. Failures keep
+// the glyph (protocol targets like steam:// have no icon).
+function loadIcon(el, item) {
+  const glyph = el.querySelector(".tile__glyph");
+  const show = (src) => { glyph.innerHTML = `<img class="tile__icon" src="${escapeHtml(src)}" alt="">`; };
+  if (item.icon) { show(item.icon); return; }
+  if (!invoke || !item.target) return;
+  invoke("get_app_icon", { target: item.target }).then(show).catch(() => {});
 }
 
 function escapeHtml(s) {
