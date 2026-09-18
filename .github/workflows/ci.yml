@@ -53,9 +53,8 @@ jobs:
         run: cargo check --manifest-path src-tauri/Cargo.toml --locked || cargo check --manifest-path src-tauri/Cargo.toml
 
   # Downloadable Windows installer — lets the owner test without any toolchain.
-  # Runs on pushes to main and on manual dispatch (so it can be tried on a branch).
+  # Runs on every push/PR so each change proves it still builds an installer.
   installer:
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

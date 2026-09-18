@@ -129,8 +129,9 @@ usability rather than fully orbital.
 
 ### 2026-09-18 — Phase 7: CI-built installer as the primary test path
 The owner never ran Fay because it needed Rust + Node. CI now builds an NSIS
-installer (`tauri build --bundles nsis`) on every push to `main` (and on manual
-dispatch) and uploads it as the `Fay-windows-installer` artifact. Installing
+installer (`tauri build --bundles nsis`) on every push/PR and uploads it as the
+`Fay-windows-installer` artifact, so each change proves it still builds before
+merge. Installing
 that artifact is the documented first-choice way to try Fay; source builds are
 for development only. NSIS only (no MSI) to keep the job fast and avoid the WiX
 download.

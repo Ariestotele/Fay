@@ -24,8 +24,8 @@ can test without installing Rust/Node.
 - **config** (Ubuntu) — JSON validation + `node -c` on `app.js` / `heart.js`.
 - **build-check** (Windows) — `cargo check` compiles the Tauri app on every push/PR.
 - **installer** (Windows) — `tauri build --bundles nsis` → uploads
-  `Fay-windows-installer` artifact. Runs on pushes to `main` and on manual
-  dispatch. Download it from the Actions run → no toolchain needed to test.
+  `Fay-windows-installer` artifact on every push/PR. Download it from the
+  Actions run → no toolchain needed to test.
 
 ## 📌 Pending — owner tasks (can't be automated)
 
