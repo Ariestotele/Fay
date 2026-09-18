@@ -15,6 +15,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Live stats in the Heart (CPU / RAM / network); GPU comes from nvidia-smi.
 sysinfo = "0.33"
+# Firefox-family bookmark backups (Zen, Firefox, LibreWolf…) are mozlz4 files.
+lz4_flex = "0.11"
 
 # Windows-only native bits: the low-level mouse hook (Ctrl+Mouse5 summon),
 # SendInput (media keys, snippet paste) and the clipboard.

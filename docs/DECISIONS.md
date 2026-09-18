@@ -303,3 +303,35 @@ PowerShell's own AppUserModelId, since Fay isn't registered for toasts) and
 calls `window.__faySay` if voice is present. A `focus` hotkey reaches the
 frontend through `eval` from the backend (`APP` handle), the one action that
 doesn't run in Rust.
+
+### 2026-09-18 — Phase 20 (batch 4): clipboard history, Everything search, bookmarks
+One "results mode" serves all three: a prefix (`>` files, `@` bookmarks) or a
+clipboard toggle replaces the tile grid with rows from an async provider;
+arrows + Enter pick, Shift+Enter is the row's second action. Clipboard history
+is **memory only** — never written to disk, cleared on quit — polled via
+`GetClipboardSequenceNumber` (cheap, no clipboard open) every 400 ms, and it
+honours the `ExcludeClipboardContentFromMonitorProcessing` format password
+managers set. Picking an entry re-sets the clipboard and pastes through the
+same path as snippets. File search shells out to Everything's `es.exe` (no
+indexing of our own — an explicit non-goal), sorted by date modified.
+Bookmarks avoid SQLite (Zen/Firefox `places.sqlite` is locked and would need
+rusqlite): Firefox-family browsers are read from their daily `jsonlz4`
+backups (mozlz4 = 8-byte magic + LE size + LZ4 block, decoded with
+`lz4_flex`), Chromium browsers from the plain `Bookmarks` JSON; cached five
+minutes. The one-day lag on Firefox-family bookmarks is accepted and
+documented.
+
+### 2026-09-18 — Phase 21 (batch 5): voice via Windows System.Speech
+Chosen over Whisper / cloud TTS because it needs nothing installed, works
+offline, and starts instantly: a single persistent PowerShell process hosts
+both the `SpeechSynthesizer` and the `SpeechRecognitionEngine` (engine
+start-up is ~1 s, so it is paid once, not per command), driven by Rust over a
+line protocol on stdin with results forwarded to the frontend by eval.
+Recognition uses a **fixed grammar** of tile names (+ open/start/launch,
+close <scene>, a few built-ins) rather than dictation, which makes it reliable
+on ordinary mics; it is **tap-to-talk** (one six-second `Recognize` per
+press), never always-on — a privacy and CPU decision. Replies are opt-in per
+tile (`say`) plus the focus-timer announcement and a spoken "Opening …"
+acknowledgement that `voiceConfirm: false` silences. The Heart wobbles while
+speaking and breathes while listening via `talk()` / `listen()`. Upgrade path
+if wanted later: swap the recognizer for Whisper behind the same protocol.
