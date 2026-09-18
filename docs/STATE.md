@@ -3,13 +3,15 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** **The whole researched pipeline is built — Phases 1–22.**
-The "do them all" run shipped six batches (PRs #18–#22): quick wins, deck
-structure, Heart extras, search, voice, AI + picker, plus a second static
-debug round. Everything compiles on Windows CI; **none of it has been run by
-a human yet** — the next thing that matters is the owner installing the
-newest CI artifact and reporting what actually works. Expect a fix-up round.
-**v0.2.0 is published on Releases** with everything up to Phase 22. (Its
+**Current phase:** **Phases 1–24 merged; v0.2.1 released.** The "do them
+all" run shipped six batches (PRs #18–#22), then a rendered debug round fixed
+the Heart's scale and the owner picked a polished look from real screenshots
+(PRs #24–#25). Everything compiles on Windows CI; **none of it has been run by
+a human yet** — the next thing that matters is the owner installing v0.2.1
+and reporting what actually works. Expect a fix-up round. Next candidate
+features (owner-ranked "viral four"): wake word, now-playing on the Heart,
+AI memory, screen text grab — see the end of this file.
+**v0.2.1 is the release to install** (Phases 1–24, with the Heart scale fix and polish); v0.2.0 predates the Heart fixes. (Its
 page also carries a stale `Fay_0.1.0_x64-setup.exe` picked up from the CI
 cache — harmless, delete it from the release's edit page if it bothers you;
 the workflows now clear old bundles before building.)
@@ -43,7 +45,7 @@ the workflows now clear old bundles before building.)
 | 21 | **Batch 5 / voice** — persistent `System.Speech` PowerShell process (`voice_config`, `say`, `listen`, `set_voice_grammar`); per-tile `say`, `kind: "say"` / `"listen"` tiles; grammar from tile names; `Heart.talk/listen`; `app.voice*` |
 | 22 | **Batch 6 / AI + picker** — natural-language bar (Enter on no-match or `?`), JSON plan → `TileAction` multi, bounded retry loop, destructive gate; screen-aware ask (`kind: "ask"`, `Ctrl+Alt+A`, capture-before-show); Anthropic or Ollama (`app.ai`); `+ Add app` picker (`pick_file`, `addTile`); debug round 2 (`-EncodedCommand`, history normalization, confirm gates) |
 | 23 | **Debug round 3 / first real render** — `docs/render-preview.js` screenshots the real frontend in headless Chromium; fixed the Heart drawn at ¼ size, `accent: "auto"` parsing as black, a duplicate tile id, and deck overflow (hint clamp, scrolling deck). `docs/ui-preview.png` + `ui-deck.png` are real renders now |
-| 24 | **Heart polish (owner-approved variant B + extras)** — soft halo under both bands, tighter band cores, brighter sphere core with bloom, clock tucked into the sphere's rim, wordmark at half opacity, quieter tile borders/glass so the Heart reads through the deck (in PR) |
+| 24 | **Heart polish (owner-approved variant B + extras)** — soft halo under both bands, tighter band cores, brighter sphere core with bloom, clock tucked into the sphere's rim, wordmark at half opacity, quieter tile borders/glass so the Heart reads through the deck |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -55,7 +57,7 @@ the workflows now clear old bundles before building.)
 
 ## 📌 Pending — owner tasks (can't be automated)
 
-- [ ] **Run Fay** — install **v0.1.0 from the Releases page** (or any newer CI
+- [ ] **Run Fay** — install **v0.2.1 from the Releases page** (or any newer CI
       artifact) and give feedback on the Heart — density, pulse, backdrop
       dimness, ball size, tile layout — and whether Ctrl+Mouse5 works.
 - [ ] Verify the exe paths for **Zen / Claude / LifeOS** — edit via tray › *Open
@@ -120,9 +122,25 @@ conversion (#16, network part) is still out — the AI bar answers those.
 **Skip (out of scope / not worth it):** full file indexing, plugin SDK,
 window snapping (PowerToys does it), always-on screen capture (Cluely-style).
 
+## 🔮 Next candidates — "viral" round (researched 2026-09-18, owner not yet picked)
+
+| # | Feature | How | Effort |
+| :-- | :-- | :-- | :-- |
+| A | **"Hey Fay" wake word** | second always-on grammar (`hey fay`) in the existing `System.Speech` host; opt-in, mic indicator in the footer | M |
+| B | **Now Playing on the Heart** | `GlobalSystemMediaTransportControls` (WinRT) polled while shown; title/artist orbit the sphere | M |
+| C | **Memory** | `memory.json` beside the config, injected into the AI system prompt; `remember …` / `forget …` | S |
+| D | **Screen text grab** | reuse the capture + Windows offline OCR (`Windows.Media.Ocr`) → clipboard | M |
+| E | Morning brief + weather | Open-Meteo (no key), focus stats logged locally, spoken | S–M |
+| F | Quick notes | markdown file in the config dir; `n …` appends, `@` search finds | S |
+| G | Translator | a prompt route through the AI bar | S |
+| H | Heart moods | per-scene tint/pace via `Heart.setMood()` | S |
+
+Parked: full "computer use", audio-reactive visuals (WASAPI loopback), phone
+companion. Recommended first: A + B + C + D, **after** the owner has run
+v0.2.1 once.
+
 ## 🧭 Later / parked
 
 - Repo default branch is still `claude/charming-ramanujan-shirak`; consider
   switching it to `main` in GitHub settings.
-- Bump `package.json` to 0.2.0 on `main` to publish Phases 14–16 as a Release
-  (currently only CI artifacts).
+- Stale `Fay_0.1.0` asset on the v0.2.0 release page (owner can delete it).
