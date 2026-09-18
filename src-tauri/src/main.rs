@@ -6,6 +6,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WebviewWindow,
 };
+use tauri_plugin_global_shortcut::Shortcut;
 
 #[derive(serde::Serialize)]
 struct MonitorInfo {
@@ -16,6 +17,27 @@ struct MonitorInfo {
     y: i32,
     scale: f64,
 }
+
+/// A global hotkey bound directly to a tile (scene or app): pressing it fires
+/// the tile's launch without opening Fay.
+#[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HotkeyBinding {
+    accelerator: String,
+    target: String,
+    #[serde(default)]
+    elevated: bool,
+    #[serde(default)]
+    audio_out: Option<String>,
+}
+
+/// All registered global shortcuts: the summon combo plus per-tile bindings.
+#[derive(Default)]
+struct Hotkeys {
+    summon: Option<Shortcut>,
+    items: Vec<(Shortcut, HotkeyBinding)>,
+}
+type HotkeyState = std::sync::Mutex<Hotkeys>;
 
 /// Resize/move the window to fill the monitor it's currently on (HUD overlay).
 fn fill_active_monitor(window: &WebviewWindow) {
@@ -44,11 +66,10 @@ fn toggle_window(window: &WebviewWindow) {
 /// - Elevated: `Start-Process -Verb RunAs` triggers a UAC prompt and runs the
 ///   target with admin rights. This is how Fay launches elevated apps without
 ///   itself running elevated.
-#[tauri::command]
-fn launch(target: String, elevated: Option<bool>) -> Result<(), String> {
+fn do_launch(target: &str, elevated: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        if elevated.unwrap_or(false) {
+        if elevated {
             // Single-quote escaping for PowerShell ('' is a literal quote).
             let safe = target.replace('\'', "''");
             std::process::Command::new("powershell")
@@ -63,19 +84,22 @@ fn launch(target: String, elevated: Option<bool>) -> Result<(), String> {
                 .map_err(|e| e.to_string())?;
         } else {
             std::process::Command::new("cmd")
-                .args(["/C", "start", "", &target])
+                .args(["/C", "start", "", target])
                 .spawn()
                 .map_err(|e| e.to_string())?;
         }
         Ok(())
     }
-
-    // Dev convenience so the project compiles/runs off-Windows.
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (target, elevated);
         Err("launch() is only implemented on Windows".into())
     }
+}
+
+#[tauri::command]
+fn launch(target: String, elevated: Option<bool>) -> Result<(), String> {
+    do_launch(&target, elevated.unwrap_or(false))
 }
 
 /// Report the current monitor layout so the UI can show it and flag when a
@@ -121,13 +145,12 @@ fn hide_window(app: tauri::AppHandle) {
 ///
 /// Requires NirSoft SoundVolumeView.exe on PATH or beside Fay (Windows has no
 /// built-in CLI for this). See docs/SETUP.md.
-#[tauri::command]
-fn set_audio_output(device: String) -> Result<(), String> {
+fn do_set_audio_output(device: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         for role in ["0", "1"] {
             let status = std::process::Command::new("SoundVolumeView.exe")
-                .args(["/SetDefault", &device, role])
+                .args(["/SetDefault", device, role])
                 .status()
                 .map_err(|e| format!("SoundVolumeView.exe not found: {e}"))?;
             if !status.success() {
@@ -143,19 +166,65 @@ fn set_audio_output(device: String) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+fn set_audio_output(device: String) -> Result<(), String> {
+    do_set_audio_output(&device)
+}
+
+/// (Re)register every global shortcut from state: the summon combo + item
+/// bindings. Item conflicts are skipped rather than failing the whole set.
+fn apply_hotkeys(app: &tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    let state = app.state::<HotkeyState>();
+    let hk = state.lock().map_err(|e| e.to_string())?;
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    if let Some(s) = hk.summon {
+        gs.register(s).map_err(|e| e.to_string())?;
+    }
+    for (s, _) in &hk.items {
+        let _ = gs.register(*s);
+    }
+    Ok(())
+}
+
 /// Re-register the global summon hotkey from a config accelerator string, e.g.
 /// "Ctrl+Alt+Space" or "CmdOrCtrl+Shift+Space". Keyboard combos only — mouse
 /// buttons aren't supported by the global-shortcut system (see DECISIONS.md).
 #[tauri::command]
 fn set_summon_hotkey(app: tauri::AppHandle, accelerator: String) -> Result<(), String> {
     use std::str::FromStr;
-    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
     let shortcut =
         Shortcut::from_str(&accelerator).map_err(|e| format!("bad hotkey '{accelerator}': {e}"))?;
-    let gs = app.global_shortcut();
-    let _ = gs.unregister_all();
-    gs.register(shortcut).map_err(|e| e.to_string())?;
-    Ok(())
+    {
+        let state = app.state::<HotkeyState>();
+        state.lock().map_err(|e| e.to_string())?.summon = Some(shortcut);
+    }
+    apply_hotkeys(&app)
+}
+
+/// Register direct hotkeys for tiles (e.g. Ctrl+Alt+1 → the Game scene).
+/// Returns the accelerators that could not be parsed (they are skipped).
+#[tauri::command]
+fn register_item_hotkeys(
+    app: tauri::AppHandle,
+    bindings: Vec<HotkeyBinding>,
+) -> Result<Vec<String>, String> {
+    use std::str::FromStr;
+    let mut items = Vec::new();
+    let mut bad = Vec::new();
+    for b in bindings {
+        match Shortcut::from_str(&b.accelerator) {
+            Ok(s) => items.push((s, b)),
+            Err(_) => bad.push(b.accelerator.clone()),
+        }
+    }
+    {
+        let state = app.state::<HotkeyState>();
+        state.lock().map_err(|e| e.to_string())?.items = items;
+    }
+    apply_hotkeys(&app)?;
+    Ok(bad)
 }
 
 /// Enable or disable launching Fay at login (config: `app.autostart`).
@@ -195,13 +264,34 @@ fn get_accent_color() -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .manage(HotkeyState::default())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        if let Some(w) = app.get_webview_window("main") {
-                            toggle_window(&w);
+                .with_handler(|app, shortcut, event| {
+                    if event.state() != tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        return;
+                    }
+                    // A tile binding? Fire it directly, without opening Fay.
+                    let binding = {
+                        let state = app.state::<HotkeyState>();
+                        let hk = state.lock().ok();
+                        hk.and_then(|hk| {
+                            hk.items
+                                .iter()
+                                .find(|(s, _)| s == shortcut)
+                                .map(|(_, b)| b.clone())
+                        })
+                    };
+                    if let Some(b) = binding {
+                        if let Some(dev) = &b.audio_out {
+                            let _ = do_set_audio_output(dev);
                         }
+                        let _ = do_launch(&b.target, b.elevated);
+                        return;
+                    }
+                    // Otherwise it's the summon combo.
+                    if let Some(w) = app.get_webview_window("main") {
+                        toggle_window(&w);
                     }
                 })
                 .build(),
@@ -216,14 +306,22 @@ fn main() {
             hide_window,
             set_audio_output,
             set_summon_hotkey,
+            register_item_hotkeys,
             set_autostart,
             get_accent_color
         ])
         .setup(|app| {
-            // Summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
-            use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
-            let summon = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space);
-            app.global_shortcut().register(summon)?;
+            // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
+            // The frontend may override it from config via set_summon_hotkey.
+            use tauri_plugin_global_shortcut::{Code, Modifiers};
+            {
+                let state = app.state::<HotkeyState>();
+                state.lock().unwrap().summon =
+                    Some(Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space));
+            }
+            if let Err(e) = apply_hotkeys(app.handle()) {
+                eprintln!("hotkeys: {e}");
+            }
 
             // System tray.
             let show_i = MenuItem::with_id(app, "show", "Show / Hide Fay", true, None::<&str>)?;

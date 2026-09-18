@@ -142,6 +142,21 @@ For each: open the Workspaces editor, arrange the windows, **Save**, then
 (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`) or edit the tile `target` to
 whatever PowerToys named it.
 
+## Direct hotkeys — fire a scene or app without opening Fay
+
+Give any scene or app a `hotkey` and pressing it launches the tile instantly,
+Fay stays hidden. The default deck binds the three scenes:
+
+```json
+{ "id": "game", "name": "Game", "hotkey": "Ctrl+Alt+2", "target": "...", "audioOut": "..." }
+```
+
+- Works for apps too (`"hotkey": "Ctrl+Alt+D"` on Discord, say).
+- A scene's `audioOut` is applied as well, exactly like clicking the tile.
+- Same accelerator format as the summon hotkey (keyboard only). A combo already
+  taken by another program is skipped silently; an unparseable one is logged.
+- The tile shows its hotkey in the corner so you can see what's bound.
+
 ## Changing the summon hotkey
 
 Set `app.hotkey` in `apps.config.json` — no rebuild needed, just refresh:

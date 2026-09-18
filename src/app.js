@@ -54,8 +54,9 @@ function tile(item, kind) {
   const el = document.createElement("button");
   el.className = `tile tile--${kind}`;
   const badge = item.elevated ? `<span class="tile__badge">ADMIN</span>` : "";
+  const key = item.hotkey ? `<span class="tile__key">${escapeHtml(item.hotkey)}</span>` : "";
   el.innerHTML = `
-    ${badge}
+    ${badge}${key}
     <span class="tile__glyph">${escapeHtml(item.glyph || "○")}</span>
     <div>
       <div class="tile__name">${escapeHtml(item.name)}</div>
@@ -161,6 +162,21 @@ async function main() {
 
     (cfg.scenes || []).forEach((s) => els.scenes.appendChild(tile(s, "scene")));
     (cfg.apps || []).forEach((a) => els.apps.appendChild(tile(a, "app")));
+
+    // Direct hotkeys: any tile with a `hotkey` fires without opening Fay.
+    const bindings = [...(cfg.scenes || []), ...(cfg.apps || [])]
+      .filter((i) => i.hotkey && i.target)
+      .map((i) => ({
+        accelerator: i.hotkey,
+        target: i.target,
+        elevated: !!i.elevated,
+        audioOut: i.audioOut || null,
+      }));
+    if (bindings.length && invoke) {
+      invoke("register_item_hotkeys", { bindings })
+        .then((bad) => { if (bad && bad.length) console.warn("unparseable hotkeys:", bad); })
+        .catch((e) => console.error("item hotkeys:", e));
+    }
   } catch (e) {
     flash(`config error: ${e.message}`);
     console.error(e);

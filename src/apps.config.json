@@ -13,6 +13,7 @@
       "id": "focus",
       "name": "Focus",
       "glyph": "◳",
+      "hotkey": "Ctrl+Alt+1",
       "target": "%USERPROFILE%\\Desktop\\Fay-Focus.lnk",
       "hint": "Zen maximized on the ASUS main · Discord + Tasks + LifeOS quartered on side"
     },
@@ -20,6 +21,7 @@
       "id": "game",
       "name": "Game",
       "glyph": "◈",
+      "hotkey": "Ctrl+Alt+2",
       "target": "%USERPROFILE%\\Desktop\\Fay-Game.lnk",
       "audioOut": "Hyper X Cloud 3 Wireless (HyperX Cloud III Wireless)",
       "hint": "Game on the ASUS main · side screen quartered: Discord, Task Manager, Zen, LifeOS · audio → headset"
@@ -28,6 +30,7 @@
       "id": "side",
       "name": "Side Stack",
       "glyph": "⊞",
+      "hotkey": "Ctrl+Alt+3",
       "target": "%USERPROFILE%\\Desktop\\Fay-Side.lnk",
       "hint": "Side screen only: quarter Discord, Task Manager, Zen, LifeOS"
     }
