@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="docs/ui-preview.png" alt="Fay — the Heart" width="820">
+  <img src="docs/ui-preview.png" alt="Fay — the Heart at rest, with live stats and a focus timer" width="820">
+  <br>
+  <img src="docs/ui-deck.png" alt="Fay — the deck open" width="820">
 </p>
 
 # Fay

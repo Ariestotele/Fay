@@ -18,7 +18,12 @@
     "voiceRate": 0,
     "voiceName": "",
     "voiceConfirm": true,
-    "ai": { "provider": "anthropic", "model": "claude-sonnet-5", "apiKey": "", "ollamaUrl": "http://localhost:11434" },
+    "ai": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "apiKey": "",
+      "ollamaUrl": "http://localhost:11434"
+    },
     "addTile": true
   },
   "scenes": [
@@ -28,7 +33,7 @@
       "glyph": "◳",
       "hotkey": "Ctrl+Alt+1",
       "target": "%USERPROFILE%\\Desktop\\Fay-Focus.lnk",
-      "hint": "Zen maximized on the ASUS main · Discord + Tasks + LifeOS quartered on side"
+      "hint": "Zen on main · Discord, Tasks, LifeOS quartered on side"
     },
     {
       "id": "game",
@@ -37,9 +42,13 @@
       "hotkey": "Ctrl+Alt+2",
       "target": "%USERPROFILE%\\Desktop\\Fay-Game.lnk",
       "audioOut": "Hyper X Cloud 3 Wireless (HyperX Cloud III Wireless)",
-      "closes": ["Discord", "zen", "Taskmgr"],
+      "closes": [
+        "Discord",
+        "zen",
+        "Taskmgr"
+      ],
       "say": "Game mode ready. Audio on the headset.",
-      "hint": "Game on the ASUS main · side screen quartered: Discord, Task Manager, Zen, LifeOS · audio → headset · Shift+click closes them"
+      "hint": "Game on main · side quartered · audio → headset · Shift+click closes"
     },
     {
       "id": "side",
@@ -47,35 +56,158 @@
       "glyph": "⊞",
       "hotkey": "Ctrl+Alt+3",
       "target": "%USERPROFILE%\\Desktop\\Fay-Side.lnk",
-      "closes": ["Discord", "zen", "Taskmgr"],
-      "hint": "Side screen only: quarter Discord, Task Manager, Zen, LifeOS"
+      "closes": [
+        "Discord",
+        "zen",
+        "Taskmgr"
+      ],
+      "hint": "Side screen: Discord, Task Manager, Zen, LifeOS"
     }
   ],
   "apps": [
-    { "id": "zen",     "name": "Zen",          "glyph": "◯", "target": "%LOCALAPPDATA%\\Programs\\zen\\zen.exe", "hint": "Zen Browser — verify install path" },
-    { "id": "discord", "name": "Discord",      "glyph": "✦", "target": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk" },
-    { "id": "claude",  "name": "Claude",       "glyph": "✳", "target": "%LOCALAPPDATA%\\AnthropicClaude\\claude.exe", "hint": "Claude desktop — verify install path" },
-    { "id": "lifeos",  "name": "LifeOS",       "glyph": "❖", "target": "lifeos", "hint": "Set to the LifeOS exe path or its web URL" },
-    { "id": "phone",   "name": "Phone Link",   "glyph": "☏", "target": "ms-phone:" },
-    { "id": "steam",   "name": "Steam",        "glyph": "▸", "target": "steam://open/main" },
-    { "id": "taskmgr", "name": "Task Manager", "glyph": "▦", "target": "taskmgr", "hint": "Add \"elevated\": true if you want it to start as admin" },
-    { "id": "yt",      "name": "YouTube",      "glyph": "▶", "keyword": "yt", "target": "https://www.youtube.com/results?search_query={query}", "hint": "type: yt lofi ⏎" },
-    { "id": "more",    "name": "More",         "glyph": "▤", "children": [
-      { "id": "sig",     "name": "Sign-off",  "glyph": "✎", "kind": "snippet", "text": "Best regards,\n— sent via Fay", "hint": "pastes into the app in front" },
-      { "id": "g",       "name": "Google",    "glyph": "◎", "keyword": "g",  "target": "https://www.google.com/search?q={query}", "hint": "type: g anything ⏎" },
-      { "id": "gh",      "name": "GitHub",    "glyph": "⌥", "keyword": "gh", "target": "https://github.com/search?q={query}" }
-    ] }
+    {
+      "id": "zen",
+      "name": "Zen",
+      "glyph": "◯",
+      "target": "%LOCALAPPDATA%\\Programs\\zen\\zen.exe",
+      "hint": "verify install path"
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "glyph": "✦",
+      "target": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk"
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "glyph": "✳",
+      "target": "%LOCALAPPDATA%\\AnthropicClaude\\claude.exe",
+      "hint": "verify install path"
+    },
+    {
+      "id": "lifeos",
+      "name": "LifeOS",
+      "glyph": "❖",
+      "target": "lifeos",
+      "hint": "set exe path or web URL"
+    },
+    {
+      "id": "phone",
+      "name": "Phone Link",
+      "glyph": "☏",
+      "target": "ms-phone:"
+    },
+    {
+      "id": "steam",
+      "name": "Steam",
+      "glyph": "▸",
+      "target": "steam://open/main"
+    },
+    {
+      "id": "taskmgr",
+      "name": "Task Manager",
+      "glyph": "▦",
+      "target": "taskmgr",
+      "hint": "add \"elevated\": true for admin"
+    },
+    {
+      "id": "yt",
+      "name": "YouTube",
+      "glyph": "▶",
+      "keyword": "yt",
+      "target": "https://www.youtube.com/results?search_query={query}",
+      "hint": "type: yt lofi ⏎"
+    },
+    {
+      "id": "more",
+      "name": "More",
+      "glyph": "▤",
+      "children": [
+        {
+          "id": "sig",
+          "name": "Sign-off",
+          "glyph": "✎",
+          "kind": "snippet",
+          "text": "Best regards,\n— sent via Fay",
+          "hint": "pastes into the app in front"
+        },
+        {
+          "id": "g",
+          "name": "Google",
+          "glyph": "◎",
+          "keyword": "g",
+          "target": "https://www.google.com/search?q={query}",
+          "hint": "type: g anything ⏎"
+        },
+        {
+          "id": "gh",
+          "name": "GitHub",
+          "glyph": "⌥",
+          "keyword": "gh",
+          "target": "https://github.com/search?q={query}"
+        }
+      ]
+    }
   ],
   "system": [
-    { "id": "winddown", "name": "Wind down", "glyph": "☾", "actions": [
-      { "kind": "media", "action": "playpause" }, { "wait": 400 }, { "kind": "system", "action": "lock" }
-    ], "hint": "pause music, then lock" },
-    { "id": "focus", "name": "Focus 25", "glyph": "◔", "kind": "focus", "minutes": 25, "hotkey": "Ctrl+Alt+F", "hint": "pomodoro · again to stop" },
-    { "id": "clip",  "name": "Clipboard", "glyph": "⎘", "kind": "clipboard", "hotkey": "Ctrl+Alt+V", "hint": "history · Enter pastes · type > for files, @ for bookmarks" },
-    { "id": "listen", "name": "Listen", "glyph": "◉", "kind": "listen", "hotkey": "Ctrl+Alt+L", "hint": "then say a tile name — “game”, “open discord”, “close game”" },
-    { "id": "ask",    "name": "Ask about screen", "glyph": "◈", "kind": "ask", "hotkey": "Ctrl+Alt+A", "hint": "captures the window in front, then ask — needs ai.apiKey" }
+    {
+      "id": "winddown",
+      "name": "Wind down",
+      "glyph": "☾",
+      "actions": [
+        {
+          "kind": "media",
+          "action": "playpause"
+        },
+        {
+          "wait": 400
+        },
+        {
+          "kind": "system",
+          "action": "lock"
+        }
+      ],
+      "hint": "pause music, then lock"
+    },
+    {
+      "id": "focus25",
+      "name": "Focus 25",
+      "glyph": "◔",
+      "kind": "focus",
+      "minutes": 25,
+      "hotkey": "Ctrl+Alt+F",
+      "hint": "pomodoro · again to stop"
+    },
+    {
+      "id": "clip",
+      "name": "Clipboard",
+      "glyph": "⎘",
+      "kind": "clipboard",
+      "hotkey": "Ctrl+Alt+V",
+      "hint": "history · Enter pastes · > files · @ bookmarks"
+    },
+    {
+      "id": "listen",
+      "name": "Listen",
+      "glyph": "◉",
+      "kind": "listen",
+      "hotkey": "Ctrl+Alt+L",
+      "hint": "then say “game”, “open discord”, “close game”"
+    },
+    {
+      "id": "ask",
+      "name": "Ask about screen",
+      "glyph": "◈",
+      "kind": "ask",
+      "hotkey": "Ctrl+Alt+A",
+      "hint": "captures the window in front — needs ai.apiKey"
+    }
   ],
-  "packs": ["power", "media"],
+  "packs": [
+    "power",
+    "media"
+  ],
   "commands": true,
   "machines": {}
 }

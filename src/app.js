@@ -941,11 +941,17 @@ async function refreshMonitors() {
   }
 }
 
+const DEFAULT_ACCENT = "#34e6c6";
 async function applyAccent(value) {
-  let accent = value || "#34e6c6";
-  if (accent === "auto" && invoke) {
-    try { accent = await invoke("get_accent_color"); } catch (e) { accent = "#34e6c6"; }
+  let accent = value || DEFAULT_ACCENT;
+  if (accent === "auto") {
+    accent = DEFAULT_ACCENT;
+    if (invoke) { try { accent = await invoke("get_accent_color"); } catch (e) { /* keep default */ } }
   }
+  // Anything that isn't a real hex color (e.g. "auto" in browser preview, or a
+  // failed registry read) falls back, so the CSS color-mix and the Heart both
+  // get a valid color.
+  if (!/^#[0-9a-f]{6}$/i.test(String(accent).trim())) accent = DEFAULT_ACCENT;
   document.documentElement.style.setProperty("--accent", accent);
   if (window.Heart) window.Heart.setAccent(accent);
 }
