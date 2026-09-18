@@ -5,6 +5,9 @@ const els = {
   scenes: document.getElementById("scenes"),
   apps: document.getElementById("apps"),
   system: document.getElementById("system"),
+  groups: document.getElementById("groups"),
+  folder: document.getElementById("folder"),
+  folderLabel: document.getElementById("folder-label"),
   brand: document.getElementById("brand"),
   status: document.getElementById("status"),
   monitors: document.getElementById("monitors"),
@@ -23,43 +26,97 @@ const invoke =
 // system: action = lock sleep hibernate restart shutdown logoff recycle darkmode
 // media:  action = playpause next prev stop mute volup voldown
 // snippet: text = pasted into the foreground app (paste:false = copy only)
-const KINDS = new Set(["launch", "system", "media", "snippet"]);
+// multi:   actions = [ step, {"wait": ms}, … ] run in order (any kind per step)
+// close:   closes = ["Discord", "zen!"] processes to close ("!" = force)
+// folder:  children = [ tiles… ] opens a sub-deck
+const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder"]);
 const SYSTEM_ACTIONS = new Set(["lock", "sleep", "hibernate", "restart", "shutdown", "logoff", "recycle", "darkmode"]);
 const MEDIA_ACTIONS = new Set(["playpause", "play", "pause", "next", "prev", "previous", "stop", "mute", "volup", "voldown"]);
 const CONFIRM_ACTIONS = new Set(["restart", "shutdown", "logoff", "hibernate"]);
 
-const kindOf = (item) => (item.kind && KINDS.has(item.kind) ? item.kind : "launch");
+function kindOf(item) {
+  if (Array.isArray(item.children)) return "folder";
+  if (Array.isArray(item.actions)) return "multi";
+  return item.kind && KINDS.has(item.kind) ? item.kind : "launch";
+}
 const isQuicklink = (item) => kindOf(item) === "launch" && /\{query\}/.test(item.target || "");
 const keywordOf = (item) => String(item.keyword || item.id || "").toLowerCase();
 const needsConfirm = (item) =>
   typeof item.confirm === "boolean" ? item.confirm : kindOf(item) === "system" && CONFIRM_ACTIONS.has(item.action);
+const canClose = (item) => Array.isArray(item.closes) && item.closes.length > 0;
 
 // The payload the backend's `fire` command / hotkey bindings understand.
 function actionOf(item, query) {
   let target = item.target || null;
   if (target && query != null) target = target.replace(/\{query\}/g, encodeURIComponent(query.trim()));
+  const kind = kindOf(item);
   return {
-    kind: kindOf(item),
+    kind,
     target,
     elevated: !!item.elevated,
     audioOut: item.audioOut || null,
     action: item.action || null,
     text: typeof item.text === "string" ? item.text : null,
     paste: item.paste !== false,
+    steps: kind === "multi" ? item.actions.map(stepOf) : [],
+    wait: item.wait != null ? Number(item.wait) : null,
+    closes: kind === "close" && canClose(item) ? item.closes.map(String) : [],
   };
 }
+const stepOf = (s) => (s && s.wait != null && !s.kind && !s.target ? { kind: "wait", wait: Number(s.wait) } : actionOf(s || {}));
+// The teardown counterpart of a scene: close what it opened.
+const closeActionOf = (item) => ({ kind: "close", closes: item.closes.map(String) });
+
+// Walk every tile in the config, including folder children (depth-first).
+function walkTiles(cfg, fn) {
+  const visit = (list, depth) => {
+    for (const t of list || []) {
+      if (!t || typeof t !== "object") continue;
+      fn(t, depth);
+      if (Array.isArray(t.children)) visit(t.children, depth + 1);
+    }
+  };
+  for (const g of ["scenes", "apps", "system"]) visit(cfg[g], 0);
+}
+function allTiles(cfg) { const out = []; walkTiles(cfg, (t) => out.push(t)); return out; }
 
 // ---- open / rest state ----------------------------------------------------
 function openDeck() { document.body.classList.add("open"); refreshRunning(); }
-function closeDeck() { document.body.classList.remove("open"); setFilter(""); }
+function closeDeck() { document.body.classList.remove("open"); leaveFolders(); setFilter(""); }
 function isOpen() { return document.body.classList.contains("open"); }
+
+// ---- folders (sub-decks) --------------------------------------------------
+const folderStack = [];
+function openFolder(item) {
+  folderStack.push(item);
+  renderFolder();
+  setFilter("");
+  refreshRunning();
+}
+function closeFolder() {
+  folderStack.pop();
+  renderFolder();
+  setFilter("");
+}
+function leaveFolders() { folderStack.length = 0; renderFolder(); }
+function renderFolder() {
+  const top = folderStack[folderStack.length - 1];
+  document.body.classList.toggle("in-folder", !!top);
+  els.folder.innerHTML = "";
+  if (!top) return;
+  els.folderLabel.textContent = folderStack.map((f) => f.name).join(" › ");
+  (top.children || []).forEach((c) => els.folder.appendChild(tile(c, "app")));
+}
+const inFolder = () => folderStack.length > 0;
 
 // ---- filter bar: type-to-filter, quicklinks, calculator, conversions --------
 let filterText = "";
 let currentQuicklink = null; // { item, query }
 let currentAnswer = null;    // string result of a calculation / conversion
-const quicklinks = [];       // tiles whose target contains {query}
-const visibleTiles = () => [...document.querySelectorAll(".tile:not(.is-hidden)")];
+let quicklinks = [];         // tiles whose target contains {query} (anywhere in the config)
+// Only tiles in the visible container count (the folder when one is open).
+const visibleTiles = () =>
+  [...(inFolder() ? els.folder : els.groups).querySelectorAll(".tile:not(.is-hidden)")];
 
 function matchQuicklink(q) {
   const m = q.match(/^(\S+)\s(.*)$/);
@@ -98,6 +155,14 @@ function setFilter(q) {
     t.classList.toggle("is-hidden", hide);
   }
   renumber();
+}
+
+// Fire the tile behind a DOM element, honoring Shift = teardown for scenes.
+function fireEl(el, shift) {
+  const item = el && el._item;
+  if (!item) return;
+  if (shift && canClose(item)) { fireClose(item); return; }
+  el.click();
 }
 
 // Label the first nine visible tiles 1–9 so a digit fires them.
@@ -260,21 +325,33 @@ const warn = (m) => { console.warn(m); setStatus(m, "is-warn", 9000); };
 // ---- firing tiles ---------------------------------------------------------
 async function fire(item, query) {
   const kind = kindOf(item);
+  if (kind === "folder") { openFolder(item); return; }
   if (kind === "launch" && !item.target) return;
   const payload = actionOf(item, query);
-  flash(`→ ${item.name}${query ? ` ▸ ${query.trim()}` : ""}${item.elevated ? " (admin)" : ""}`);
+  await send(payload, `→ ${item.name}${query ? ` ▸ ${query.trim()}` : ""}${item.elevated ? " (admin)" : ""}`, item.name);
+}
+
+// Scene teardown: close the processes listed in `closes` (Shift+click / Shift+digit / ×).
+async function fireClose(item) {
+  if (!canClose(item)) return;
+  await send(closeActionOf(item), `× ${item.name}`, item.name);
+}
+
+const pastes = (a) => (a.kind === "snippet" && a.paste) || (a.steps || []).some(pastes);
+async function send(payload, label, name) {
+  flash(label);
   if (!invoke) {
     console.log("[preview] would fire:", payload);
-    flash(`(preview) ${item.name}`);
+    flash(`(preview) ${name}`);
     return;
   }
   // A snippet pastes into whatever is in front: get out of the way first.
-  if (kind === "snippet" && payload.paste) await invoke("hide_window").catch(() => {});
+  if (pastes(payload)) await invoke("hide_window").catch(() => {});
   try {
     const w = await invoke("fire", { action: payload });
     if (w) warn(w);
   } catch (e) {
-    warn(`${item.name}: ${e}`);
+    warn(`${name}: ${e}`);
   }
 }
 
@@ -294,21 +371,26 @@ function disarm(el) {
 
 function tile(item, kind) {
   const el = document.createElement("button");
-  el.className = `tile tile--${kind} tile--k-${kindOf(item)}`;
+  const k = kindOf(item);
+  el.className = `tile tile--${kind} tile--k-${k}`;
   el.dataset.name = item.name || "";
   el.dataset.proc = processNameFor(item);
   item._el = el;
+  el._item = item;
   const badge = item.elevated ? `<span class="tile__badge">ADMIN</span>` : "";
   const key = item.hotkey ? `<span class="tile__key">${escapeHtml(item.hotkey)}</span>` : "";
   const ql = isQuicklink(item) ? `<span class="tile__key tile__kw">${escapeHtml(keywordOf(item))} …</span>` : "";
+  const close = canClose(item) ? `<span class="tile__close" title="Close ${escapeHtml(item.closes.join(", "))} (Shift+click)">×</span>` : "";
+  const hint = item.hint || (k === "folder" ? `${item.children.length} item${item.children.length === 1 ? "" : "s"}` : "");
   el.innerHTML = `
-    ${badge}${key || ql}
-    <span class="tile__glyph">${escapeHtml(item.glyph || "○")}</span>
+    ${badge}${key || ql}${close}
+    <span class="tile__glyph">${escapeHtml(item.glyph || (k === "folder" ? "▤" : "○"))}</span>
     <div>
       <div class="tile__name"><span class="tile__idx"></span>${escapeHtml(item.name)}</div>
-      ${item.hint ? `<div class="tile__hint">${escapeHtml(item.hint)}</div>` : ""}
+      ${hint ? `<div class="tile__hint">${escapeHtml(hint)}</div>` : ""}
     </div>`;
-  el.addEventListener("click", () => {
+  el.addEventListener("click", (e) => {
+    if (e.shiftKey && canClose(item)) { fireClose(item); return; }
     if (isQuicklink(item)) {
       const q = currentQuicklink && currentQuicklink.item === item ? currentQuicklink.query : null;
       if (q == null) { setFilter(`${keywordOf(item)} `); return; } // prompt for the query
@@ -319,7 +401,8 @@ function tile(item, kind) {
     disarm(el);
     fire(item);
   });
-  if (isQuicklink(item)) quicklinks.push(item);
+  const x = el.querySelector(".tile__close");
+  if (x) x.addEventListener("click", (e) => { e.stopPropagation(); fireClose(item); });
   loadIcon(el, item);
   return el;
 }
@@ -404,7 +487,7 @@ function wireInput() {
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (isOpen()) { if (filterText) setFilter(""); else closeDeck(); }
+      if (isOpen()) { if (filterText) setFilter(""); else if (inFolder()) closeFolder(); else closeDeck(); }
       else if (invoke) invoke("hide_window");
       return;
     }
@@ -416,17 +499,24 @@ function wireInput() {
     const plain = !e.ctrlKey && !e.altKey && !e.metaKey;
     // Digits fire tiles only while nothing is typed; once the filter has text
     // (or starts with "=") they are part of it, so "= 1440*0.62" works.
-    if (/^[1-9]$/.test(e.key) && plain && !filterText) {
-      const t = visibleTiles()[Number(e.key) - 1];
-      if (t) t.click();
+    // Shift+digit on a scene with `closes` tears it down instead.
+    if (/^[1-9!@#$%^&*(]$/.test(e.key) && plain && !filterText) {
+      const n = /^[1-9]$/.test(e.key) ? Number(e.key) : ")!@#$%^&*(".indexOf(e.key);
+      const t = visibleTiles()[n - 1];
+      if (t) fireEl(t, e.shiftKey);
       e.preventDefault();
       return;
     }
-    if (e.key === "Backspace") { setFilter(filterText.slice(0, -1)); e.preventDefault(); return; }
+    if (e.key === "Backspace") {
+      if (!filterText && inFolder()) closeFolder(); else setFilter(filterText.slice(0, -1));
+      e.preventDefault();
+      return;
+    }
     if (e.key === "Enter") {
       if (currentAnswer != null) { copyAnswer(); e.preventDefault(); return; }
       if (currentQuicklink) { fire(currentQuicklink.item, currentQuicklink.query); e.preventDefault(); return; }
-      if (filterText) { const t = visibleTiles()[0]; if (t) t.click(); e.preventDefault(); }
+      if (filterText) { const t = visibleTiles()[0]; if (t) fireEl(t, e.shiftKey); e.preventDefault(); return; }
+      if (e.shiftKey && document.activeElement && document.activeElement._item) { fireEl(document.activeElement, true); e.preventDefault(); }
       return; // no filter: native Enter on a focused tile
     }
     if (e.key.length === 1 && plain) {
@@ -536,26 +626,48 @@ function validateConfig(cfg, packs) {
   if (!isObj(cfg)) return ["config root must be an object { … }"];
   if ("app" in cfg && !isObj(cfg.app)) p.push(`"app" must be an object`);
   const ids = new Set();
+  // One tile action (a tile itself, or a step of a multi-action tile).
+  const checkAction = (t, who, isStep) => {
+    if (t.kind && !KINDS.has(t.kind)) p.push(`${who}: unknown kind "${t.kind}" (launch, system, media, snippet, multi, close)`);
+    const k = kindOf(t);
+    if (k === "launch" && !t.target) p.push(`${who} needs a "target"`);
+    if (k === "system" && !SYSTEM_ACTIONS.has(t.action)) p.push(`${who}: system action must be one of ${[...SYSTEM_ACTIONS].join("/")}`);
+    if (k === "media" && !MEDIA_ACTIONS.has(t.action)) p.push(`${who}: media action must be one of playpause/next/prev/stop/mute/volup/voldown`);
+    if (k === "snippet" && typeof t.text !== "string") p.push(`${who} needs "text"`);
+    if (k === "close" && !canClose(t)) p.push(`${who} needs "closes": ["process", …]`);
+    if (k === "multi") {
+      if (!t.actions.length) p.push(`${who}: "actions" is empty`);
+      t.actions.forEach((s, i) => {
+        const sw = `${who} step ${i + 1}`;
+        if (!isObj(s)) { p.push(`${sw} must be an object`); return; }
+        if (s.wait != null && (typeof s.wait !== "number" || s.wait < 0)) p.push(`${sw}: "wait" must be milliseconds`);
+        else if (s.wait == null || s.kind || s.target) checkAction(s, sw, true);
+      });
+    }
+    if (k === "folder" && isStep) p.push(`${who}: a step can't be a folder`);
+    if (t.closes != null && (!Array.isArray(t.closes) || !t.closes.every((c) => typeof c === "string"))) p.push(`${who}: "closes" must be an array of process names`);
+  };
+  const checkTile = (t, at) => {
+    if (!isObj(t)) { p.push(`${at} must be an object`); return; }
+    const who = t.id ? `"${t.id}"` : at;
+    if (!t.id) p.push(`${at} needs an "id"`);
+    else if (ids.has(t.id)) p.push(`duplicate id ${who}`);
+    else ids.add(t.id);
+    if (!t.name) p.push(`${who} needs a "name"`);
+    if (t.hotkey != null && typeof t.hotkey !== "string") p.push(`${who}: "hotkey" must be a string`);
+    if (kindOf(t) === "folder") {
+      if (t.hotkey) p.push(`${who}: a folder can't have a hotkey`);
+      t.children.forEach((c, i) => checkTile(c, `${who} › [${i}]`));
+    } else {
+      checkAction(t, who, false);
+    }
+  };
   for (const g of ["scenes", "apps", "system"]) {
     if (!(g in cfg)) continue;
     if (!Array.isArray(cfg[g])) { p.push(`"${g}" must be an array [ … ]`); continue; }
-    cfg[g].forEach((t, i) => {
-      const at = `${g}[${i}]`;
-      if (!isObj(t)) { p.push(`${at} must be an object`); return; }
-      const who = t.id ? `"${t.id}"` : at;
-      if (!t.id) p.push(`${at} needs an "id"`);
-      else if (ids.has(t.id)) p.push(`duplicate id ${who}`);
-      else ids.add(t.id);
-      if (!t.name) p.push(`${who} needs a "name"`);
-      if (t.kind && !KINDS.has(t.kind)) p.push(`${who}: unknown kind "${t.kind}" (launch, system, media, snippet)`);
-      const k = kindOf(t);
-      if (k === "launch" && !t.target) p.push(`${who} needs a "target"`);
-      if (k === "system" && !SYSTEM_ACTIONS.has(t.action)) p.push(`${who}: system action must be one of ${[...SYSTEM_ACTIONS].join("/")}`);
-      if (k === "media" && !MEDIA_ACTIONS.has(t.action)) p.push(`${who}: media action must be one of playpause/next/prev/stop/mute/volup/voldown`);
-      if (k === "snippet" && typeof t.text !== "string") p.push(`${who} needs "text"`);
-      if (t.hotkey != null && typeof t.hotkey !== "string") p.push(`${who}: "hotkey" must be a string`);
-    });
+    cfg[g].forEach((t, i) => checkTile(t, `${g}[${i}]`));
   }
+  if ("commands" in cfg && typeof cfg.commands !== "boolean" && typeof cfg.commands !== "string") p.push(`"commands" must be true, false or a folder path`);
   if ("packs" in cfg) {
     if (!Array.isArray(cfg.packs)) p.push(`"packs" must be an array`);
     else for (const n of cfg.packs) if (!packs[n]) p.push(`unknown pack "${n}" (have: ${Object.keys(packs).filter((k) => !k.startsWith("_")).join(", ")})`);
@@ -581,7 +693,24 @@ async function applyMachineProfile(cfg) {
   return host;
 }
 
-const allTiles = (cfg) => [...(cfg.scenes || []), ...(cfg.apps || []), ...(cfg.system || [])];
+// The commands folder: every .ps1 / .bat / .cmd / .exe / .lnk in it becomes a
+// tile in the `system` group. `commands: false` turns it off; a string points
+// at a custom folder (default: <config dir>\commands, see tray menu).
+async function applyCommandsFolder(cfg) {
+  if (!invoke || cfg.commands === false) return;
+  const dir = typeof cfg.commands === "string" ? cfg.commands : null;
+  let list = [];
+  try { list = await invoke("list_commands", { dir }); } catch (e) { warn(`commands folder: ${e}`); return; }
+  if (!list.length) return;
+  const glyph = { ps1: "›_", bat: "▮", cmd: "▮", exe: "▪", lnk: "↗" };
+  cfg.system = cfg.system || [];
+  for (const c of list) {
+    cfg.system.push({
+      id: `cmd-${c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      name: c.name, glyph: glyph[c.ext] || "▪", target: c.path, hint: "commands folder",
+    });
+  }
+}
 
 async function main() {
   startClock();
@@ -591,7 +720,9 @@ async function main() {
     const [{ cfg, seeded, path, broken }, packs] = await Promise.all([loadConfig(), loadPacks()]);
     const problems = validateConfig(cfg, packs);
     applyPacks(cfg, packs);
+    await applyCommandsFolder(cfg);
     window.__fayHost = await applyMachineProfile(cfg);
+    quicklinks = allTiles(cfg).filter(isQuicklink);
     const app = cfg.app || {};
     if (app.name) els.brand.textContent = app.name.toUpperCase();
 
@@ -625,10 +756,16 @@ async function main() {
     // otherwise a hidden window would keep spawning the process check forever.
     setInterval(() => { if (isOpen() && document.hasFocus()) refreshRunning(); }, 5000);
 
-    // Direct hotkeys: any tile with a `hotkey` fires without opening Fay.
-    const bindings = allTiles(cfg)
-      .filter((i) => i.hotkey && !isQuicklink(i) && (kindOf(i) !== "launch" || i.target))
-      .map((i) => ({ accelerator: i.hotkey, ...actionOf(i) }));
+    // Direct hotkeys: any tile with a `hotkey` fires without opening Fay
+    // (folders excluded); `closeHotkey` tears a scene down.
+    const bindings = [];
+    for (const i of allTiles(cfg)) {
+      const k = kindOf(i);
+      if (i.hotkey && k !== "folder" && !isQuicklink(i) && (k !== "launch" || i.target)) {
+        bindings.push({ accelerator: i.hotkey, ...actionOf(i) });
+      }
+      if (i.closeHotkey && canClose(i)) bindings.push({ accelerator: i.closeHotkey, ...closeActionOf(i) });
+    }
     if (bindings.length && invoke) {
       invoke("register_item_hotkeys", { bindings })
         .then((bad) => { if (bad && bad.length) warn(`hotkeys not bound: ${bad.join(", ")}`); })

@@ -27,6 +27,8 @@ struct MonitorInfo {
 /// - `media`:   `action` is playpause / next / prev / stop / mute / volup / voldown.
 /// - `snippet`: `text` is copied to the clipboard and (unless `paste: false`)
 ///              pasted into the foreground app with Ctrl+V.
+/// - `multi`:   `steps` run in order (each a TileAction; `wait` = pause in ms).
+/// - `close`:   `closes` names processes to close (taskkill; `name!` = force).
 #[derive(Clone, Default, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TileAction {
@@ -44,6 +46,12 @@ struct TileAction {
     text: Option<String>,
     #[serde(default)]
     paste: Option<bool>,
+    #[serde(default)]
+    steps: Vec<TileAction>,
+    #[serde(default)]
+    wait: Option<u64>,
+    #[serde(default)]
+    closes: Vec<String>,
 }
 
 /// A global hotkey bound directly to a tile: pressing it performs the tile's
@@ -70,12 +78,170 @@ fn perform(a: &TileAction) -> Result<Option<String>, String> {
         "system" => do_system_action(a.action.as_deref().unwrap_or(""))?,
         "media" => do_media_key(a.action.as_deref().unwrap_or(""))?,
         "snippet" => do_paste_text(a.text.as_deref().unwrap_or(""), a.paste.unwrap_or(true))?,
+        "wait" => std::thread::sleep(std::time::Duration::from_millis(a.wait.unwrap_or(500).min(60_000))),
+        "close" => {
+            if let Some(w) = do_close(&a.closes)? {
+                warning.get_or_insert(w);
+            }
+        }
+        "multi" => {
+            for (i, step) in a.steps.iter().enumerate() {
+                match perform(step) {
+                    Ok(Some(w)) => {
+                        warning.get_or_insert(w);
+                    }
+                    Ok(None) => {}
+                    Err(e) => return Err(format!("step {}: {e}", i + 1)),
+                }
+            }
+        }
         _ => match a.target.as_deref().filter(|t| !t.is_empty()) {
             Some(t) => do_launch(t, a.elevated)?,
             None => return Err("tile has no target".into()),
         },
     }
     Ok(warning)
+}
+
+/// Ask processes to close (graceful `taskkill /IM`, which sends WM_CLOSE). A
+/// trailing `!` on a name forces it (`/F`). Names that weren't running come
+/// back as a warning, not an error, so a scene teardown never "fails".
+fn do_close(names: &[String]) -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut missed = Vec::new();
+        for raw in names {
+            let (name, force) = match raw.trim().strip_suffix('!') {
+                Some(n) => (n.trim(), true),
+                None => (raw.trim(), false),
+            };
+            if name.is_empty() {
+                continue;
+            }
+            let image = if name.to_ascii_lowercase().ends_with(".exe") {
+                name.to_string()
+            } else {
+                format!("{name}.exe")
+            };
+            let mut c = cmd("taskkill");
+            if force {
+                c.arg("/F");
+            }
+            let ok = c
+                .args(["/IM", &image])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if !ok {
+                missed.push(name.to_string());
+            }
+        }
+        Ok(if missed.is_empty() {
+            None
+        } else {
+            Some(format!("not running: {}", missed.join(", ")))
+        })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = names;
+        Err("closing processes is only implemented on Windows".into())
+    }
+}
+
+/// Expand `%VAR%` references (for paths we hand to PowerShell, which does not).
+fn expand_env(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(start) = rest.find('%') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        match after.find('%') {
+            Some(end) if end > 0 => {
+                let name = &after[..end];
+                match std::env::var(name) {
+                    Ok(v) => out.push_str(&v),
+                    Err(_) => {
+                        out.push('%');
+                        out.push_str(name);
+                        out.push('%');
+                    }
+                }
+                rest = &after[end + 1..];
+            }
+            _ => {
+                out.push('%');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+#[derive(serde::Serialize)]
+struct CommandEntry {
+    name: String,
+    path: String,
+    ext: String,
+}
+
+/// The "commands folder": drop `.ps1` / `.bat` / `.cmd` / `.exe` / `.lnk` files
+/// in it and they become tiles. Default location is `<config dir>\commands`
+/// (created so it's easy to find; tray › Open commands folder).
+fn commands_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join("commands"))
+}
+
+#[tauri::command]
+async fn list_commands(app: tauri::AppHandle, dir: Option<String>) -> Result<Vec<CommandEntry>, String> {
+    let custom = dir.as_deref().map(str::trim).filter(|d| !d.is_empty());
+    let path = match custom {
+        Some(d) => std::path::PathBuf::from(expand_env(d)),
+        None => {
+            let p = commands_dir(&app)?;
+            let _ = std::fs::create_dir_all(&p);
+            p
+        }
+    };
+    let mut out = Vec::new();
+    let rd = match std::fs::read_dir(&path) {
+        Ok(rd) => rd,
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    for entry in rd.flatten() {
+        let p = entry.path();
+        if !p.is_file() {
+            continue;
+        }
+        let ext = p
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        if !["ps1", "bat", "cmd", "exe", "lnk"].contains(&ext.as_str()) {
+            continue;
+        }
+        let name = p
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("command")
+            .to_string();
+        out.push(CommandEntry { name, path: p.display().to_string(), ext });
+    }
+    out.sort_by_key(|c| c.name.to_lowercase());
+    Ok(out)
+}
+
+fn open_commands_folder(app: &tauri::AppHandle) {
+    if let Ok(dir) = commands_dir(app) {
+        let _ = std::fs::create_dir_all(&dir);
+        #[cfg(target_os = "windows")]
+        {
+            let _ = cmd("explorer.exe").arg(&dir).spawn();
+        }
+    }
 }
 
 /// Fire a tile from the UI. Async: every branch shells out or sleeps.
@@ -340,6 +506,30 @@ fn toggle_window(window: &WebviewWindow) {
 fn do_launch(target: &str, elevated: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        // PowerShell scripts: the .ps1 file association is "edit", so run them
+        // explicitly (hidden console; scripts that need a window can use a .bat).
+        if target.to_ascii_lowercase().ends_with(".ps1") {
+            let script = expand_env(target);
+            if elevated {
+                let safe = script.replace('\'', "''");
+                cmd("powershell")
+                    .args([
+                        "-NoProfile",
+                        "-WindowStyle",
+                        "Hidden",
+                        "-Command",
+                        &format!("Start-Process -Verb RunAs -FilePath powershell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{safe}\"'"),
+                    ])
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+            } else {
+                cmd("powershell")
+                    .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", &script])
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+            }
+            return Ok(());
+        }
         if elevated {
             // Single-quote escaping for PowerShell ('' is a literal quote).
             let safe = target.replace('\'', "''");
@@ -925,7 +1115,8 @@ fn main() {
             set_mouse_summon,
             fire,
             set_clipboard,
-            set_summon_monitor
+            set_summon_monitor,
+            list_commands
         ])
         .setup(|app| {
             // Default summon hotkey: Ctrl+Alt+Space (avoids the reserved Win key).
@@ -943,9 +1134,10 @@ fn main() {
             // System tray.
             let show_i = MenuItem::with_id(app, "show", "Show / Hide Fay", true, None::<&str>)?;
             let config_i = MenuItem::with_id(app, "config", "Open config file", true, None::<&str>)?;
+            let commands_i = MenuItem::with_id(app, "commands", "Open commands folder", true, None::<&str>)?;
             let reload_i = MenuItem::with_id(app, "reload", "Reload config", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit Fay", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &config_i, &reload_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_i, &config_i, &commands_i, &reload_i, &quit_i])?;
 
             let _tray = TrayIconBuilder::with_id("fay-tray")
                 .tooltip("Fay — command deck")
@@ -958,6 +1150,7 @@ fn main() {
                         }
                     }
                     "config" => open_config_in_editor(app),
+                    "commands" => open_commands_folder(app),
                     "reload" => {
                         if let Some(w) = app.get_webview_window("main") {
                             let _ = w.eval("location.reload()");

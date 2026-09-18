@@ -274,6 +274,63 @@ Sound, Display, Network, Windows Update, Installed apps via `ms-settings:`),
 your config already has a tile with the same id, so you can override any of
 them (e.g. give `sys-lock` a hotkey).
 
+## Folders — keep the deck under nine keys
+
+A tile with `children` opens a **sub-deck** instead of launching anything:
+
+```json
+{ "id": "web", "name": "Web", "glyph": "▤", "children": [
+  { "id": "g",  "name": "Google", "keyword": "g", "target": "https://www.google.com/search?q={query}" },
+  { "id": "gh", "name": "GitHub", "target": "https://github.com" }
+] }
+```
+
+Inside a folder the number keys, typing and Enter work on its children;
+**Esc** or **Backspace** (with nothing typed) goes back up. Folders nest.
+Quicklinks and hotkeys on children work from anywhere, folder or not.
+
+## Multi-action tiles — one press, several steps
+
+`actions` runs steps in order. Each step is any tile action (`kind`, `target`,
+`action`, `text`, `audioOut`…) or a pause `{ "wait": ms }`:
+
+```json
+{ "id": "winddown", "name": "Wind down", "actions": [
+  { "kind": "media", "action": "playpause" },
+  { "wait": 400 },
+  { "kind": "system", "action": "lock" }
+] }
+```
+
+Steps stop at the first failure (reported as *step N: …*). A direct `hotkey`
+runs the whole sequence too.
+
+## Scene teardown — close what a scene opened
+
+Give a scene (or any tile) a `closes` list of process names, as shown in Task
+Manager's *Details* tab without `.exe`:
+
+```json
+{ "id": "game", "name": "Game", "target": "…Fay-Game.lnk",
+  "closes": ["Discord", "zen", "Taskmgr"], "closeHotkey": "Ctrl+Alt+Shift+2" }
+```
+
+Then **Shift+click** the tile (or **Shift+digit**, **Shift+Enter**, or the
+**×** that appears on hover) to close them. Windows asks each app to close
+politely; add `!` to force one (`"Discord!"`) — note Discord's default "close
+to tray" means a polite close only hides it. Apps that weren't running are
+listed as a footer note, not an error. `closeHotkey` binds the teardown
+globally. A standalone tile can be `"kind": "close"` with a `closes` list.
+
+## Commands folder — drop scripts in, get tiles out
+
+Tray › **Open commands folder** opens `%APPDATA%\com.fay.hub\commands`. Any
+`.ps1`, `.bat`, `.cmd`, `.exe` or `.lnk` you put there shows up as a tile in
+the *system* group on the next reload, named after the file. `.ps1` scripts run
+hidden with `-ExecutionPolicy Bypass`; `.bat` files open their console as usual.
+`"commands": false` turns this off; `"commands": "D:\\scripts"` uses another
+folder (`%VAR%` allowed).
+
 ## Which monitor Fay opens on
 
 `"summonOn": "cursor"` (default) shows Fay on the monitor under the mouse;

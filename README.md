@@ -33,6 +33,10 @@ Every push to `main` also produces a fresh installer under
 | **Calculator** | `= 1440*0.62` → `892.8`, `= 5 mi to km` → `8.04672 km`. Enter copies the answer. |
 | **System & media tiles** | Lock, Sleep, Shut down (press twice), Play/Pause, Volume ± — ready-made packs, or your own. |
 | **Snippets** | A tile that pastes a saved text into whatever app is in front. |
+| **Folders** | A tile with `children` opens a sub-deck. Nine keys, unlimited tiles. |
+| **Multi-action** | `actions: [ … ]` runs steps in order with pauses — Stream Deck style. |
+| **Scene teardown** | `closes: ["Discord", "zen"]` — Shift+click a scene to close what it opened. |
+| **Commands folder** | Drop `.ps1` / `.bat` / `.exe` / `.lnk` files in a folder; they become tiles. |
 | **Real icons** | Each tile shows its app's actual icon, extracted and cached automatically. |
 | **Running dot** | Apps already open get a glowing dot, so a scene doesn't relaunch them by surprise. |
 | **Accent auto** | Colors follow your Windows accent color (or pin a hex). |
@@ -86,6 +90,10 @@ Notepad. Save, then tray › **Reload config**.
 | `action` | tile | `system`: `lock sleep hibernate restart shutdown logoff recycle darkmode`. `media`: `playpause next prev stop mute volup voldown`. |
 | `text` / `paste` | tile | Snippet text; `"paste": false` copies without pasting. |
 | `keyword` | tile | Quicklink keyword for a `target` containing `{query}` (defaults to `id`). |
+| `children` | tile | Makes the tile a folder holding these tiles. |
+| `actions` | tile | Multi-action: steps run in order; `{ "wait": 400 }` pauses. |
+| `closes` / `closeHotkey` | tile | Process names to close on Shift+click / ×; `"name!"` forces. Optional global hotkey for it. |
+| `commands` | root | `true` (default folder), `false`, or a folder path of scripts that become tiles. |
 | `confirm` | tile | Require a second press within 3 s (default on for shutdown / restart / logoff / hibernate). |
 | `target` | tile | An exe path, a command on PATH, a `.lnk`, or a URL / protocol (`steam://`, `ms-phone:`). `%ENV%` vars expand. |
 | `hotkey` | tile | Fire this tile globally, without opening Fay. |
@@ -120,4 +128,4 @@ The project's working memory is in `docs/`: **STATE.md** (what's done / next),
 
 ## Status
 
-Seventeen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
+Eighteen phases shipped and CI-green. See [docs/STATE.md](docs/STATE.md).
