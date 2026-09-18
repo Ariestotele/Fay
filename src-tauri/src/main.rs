@@ -1170,6 +1170,166 @@ $xml.LoadXml("<toast><visual><binding template='ToastGeneric'><text>{t}</text><t
     }
 }
 
+// ---- doctor: first-run self-check ------------------------------------------
+// One tile runs every environment check that no CI can: do the tile targets
+// exist, are the helper tools on PATH, is the voice host up, is AI reachable.
+// The frontend renders the rows and copies the report on Enter.
+
+#[derive(serde::Deserialize)]
+struct DoctorTarget {
+    name: String,
+    target: String,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct DoctorRow {
+    /// Check label, e.g. "tile Zen" or "tool es.exe".
+    name: String,
+    /// true = ok, false = problem, None = informational.
+    ok: Option<bool>,
+    detail: String,
+}
+
+fn row(name: &str, ok: Option<bool>, detail: impl Into<String>) -> DoctorRow {
+    DoctorRow { name: name.to_string(), ok, detail: detail.into() }
+}
+
+/// Where a command resolves on PATH (Windows `where.exe`), if anywhere.
+fn which(exe: &str) -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let out = cmd("where.exe").arg(exe).output().ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        String::from_utf8_lossy(&out.stdout).lines().next().map(|l| l.trim().to_string()).filter(|l| !l.is_empty())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = exe;
+        None
+    }
+}
+
+/// Classify a tile target: URL / protocol, existing file, command on PATH, or missing.
+fn check_target(target: &str) -> (Option<bool>, String) {
+    let t = target.trim();
+    if t.is_empty() {
+        return (Some(false), "empty target".into());
+    }
+    // A protocol (steam://, ms-settings:, https://) — nothing to check on disk.
+    let proto = t.split_once(':').map(|(p, _)| p);
+    let is_drive = t.len() > 1 && t.as_bytes()[1] == b':' && t.as_bytes()[0].is_ascii_alphabetic();
+    if let (Some(p), false) = (proto, is_drive) {
+        if !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.') {
+            return (None, format!("{p}: link — opened by Windows"));
+        }
+    }
+    let expanded = expand_env(t);
+    if expanded.contains('%') {
+        return (Some(false), format!("unknown %VAR% in {expanded}"));
+    }
+    let p = std::path::Path::new(&expanded);
+    if p.exists() {
+        return (Some(true), expanded);
+    }
+    if !expanded.contains(['\\', '/']) {
+        return match which(&expanded).or_else(|| which(&format!("{expanded}.exe"))) {
+            Some(w) => (Some(true), format!("on PATH: {w}")),
+            None => (Some(false), format!("\"{expanded}\" is not a file and not on PATH")),
+        };
+    }
+    (Some(false), format!("not found: {expanded}"))
+}
+
+fn tool_row(label: &str, exe: &str, why: &str) -> DoctorRow {
+    match which(exe) {
+        Some(w) => row(label, Some(true), w),
+        None => row(label, Some(false), format!("{exe} not on PATH — {why}")),
+    }
+}
+
+#[tauri::command]
+async fn doctor(app: tauri::AppHandle, targets: Vec<DoctorTarget>, es: Option<String>) -> Result<Vec<DoctorRow>, String> {
+    let mut rows = Vec::new();
+
+    // Where things live.
+    rows.push(row("machine", None, format!("{} · {}", get_hostname(), std::env::consts::OS)));
+    match config_path(&app) {
+        Ok(p) => rows.push(row("config file", Some(p.exists()), p.display().to_string())),
+        Err(e) => rows.push(row("config file", Some(false), e)),
+    }
+    if let Ok(d) = commands_dir(&app) {
+        let n = std::fs::read_dir(&d).map(|rd| rd.flatten().filter(|e| e.path().is_file()).count()).unwrap_or(0);
+        rows.push(row("commands folder", None, format!("{} · {n} file(s)", d.display())));
+    }
+
+    // Tile targets: the checks the owner otherwise does by clicking each tile.
+    for t in &targets {
+        let (ok, detail) = check_target(&t.target);
+        rows.push(row(&format!("tile {}", t.name), ok, detail));
+    }
+
+    // Helper tools.
+    rows.push(tool_row("PowerShell", "powershell.exe", "needed for voice, toasts, system actions"));
+    let pt = ["LOCALAPPDATA", "ProgramFiles"]
+        .iter()
+        .filter_map(|v| std::env::var(v).ok())
+        .map(|d| std::path::Path::new(&d).join("PowerToys").join("PowerToys.exe"))
+        .find(|p| p.exists());
+    rows.push(match pt {
+        Some(p) => row("PowerToys", Some(true), p.display().to_string()),
+        None => row("PowerToys", Some(false), "not found — Workspaces scenes need it (see SETUP)"),
+    });
+    rows.push(tool_row("SoundVolumeView", "SoundVolumeView.exe", "scene audioOut needs it (NirSoft)"));
+    let es_exe = es.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(expand_env).unwrap_or_else(|| "es.exe".into());
+    rows.push(if std::path::Path::new(&es_exe).exists() {
+        row("Everything es.exe", Some(true), es_exe)
+    } else {
+        tool_row("Everything es.exe", &es_exe, "'>' file search needs it (voidtools)")
+    });
+    rows.push(match which("nvidia-smi") {
+        Some(w) => row("nvidia-smi", Some(true), w),
+        None => row("nvidia-smi", None, "not found — GPU readouts stay blank (fine on AMD/Intel)"),
+    });
+
+    // Runtime state of the long-lived helpers.
+    let clip = CLIP_ENABLED.load(std::sync::atomic::Ordering::Relaxed);
+    let n = CLIP_HISTORY.lock().map(|h| h.len()).unwrap_or(0);
+    rows.push(row("clipboard watcher", None, if clip { format!("on · {n} entries so far") } else { "off (app.clipboard)".into() }));
+    let bm = list_bookmarks(Some(false)).await.map(|b| b.len()).unwrap_or(0);
+    rows.push(row("bookmarks", None, format!("{bm} found across browsers")));
+    let venabled = VOICE_ENABLED.load(std::sync::atomic::Ordering::Relaxed);
+    let vrunning = VOICE.lock().map(|v| v.is_some()).unwrap_or(false);
+    rows.push(row(
+        "voice host",
+        if venabled { Some(vrunning) } else { None },
+        match (venabled, vrunning) {
+            (false, _) => "off (app.voice)".to_string(),
+            (true, true) => "System.Speech process running".to_string(),
+            (true, false) => "not started yet — starts on the first say/listen".to_string(),
+        },
+    ));
+
+    // AI: configured? For Ollama also ping the server (cheap, local).
+    let ai = AI.lock().ok().and_then(|g| (*g).clone());
+    rows.push(match ai {
+        None => row("AI", Some(false), "not configured"),
+        Some(c) if c.provider == "ollama" => {
+            let url = format!("{}/api/tags", c.ollama_url);
+            let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(2)).build();
+            match agent.get(&url).call() {
+                Ok(_) => row("AI", Some(true), format!("ollama · {} · {} reachable", c.model, c.ollama_url)),
+                Err(e) => row("AI", Some(false), format!("ollama at {} not reachable: {e}", c.ollama_url)),
+            }
+        }
+        Some(c) if c.api_key.is_empty() => row("AI", Some(false), "no API key — set app.ai.apiKey in the local config or ANTHROPIC_API_KEY"),
+        Some(c) => row("AI", Some(true), format!("anthropic · {} · key set ({} chars)", c.model, c.api_key.len())),
+    });
+
+    Ok(rows)
+}
+
 fn open_commands_folder(app: &tauri::AppHandle) {
     if let Ok(dir) = commands_dir(app) {
         let _ = std::fs::create_dir_all(&dir);
@@ -2088,7 +2248,8 @@ fn main() {
             ai_config,
             ai_ask,
             capture_screen,
-            pick_file
+            pick_file,
+            doctor
         ])
         .setup(|app| {
             let _ = APP.set(app.handle().clone());
@@ -2264,6 +2425,22 @@ mod tests {
     fn perform_wait_caps_at_sixty_seconds_and_returns_ok() {
         let a = TileAction { kind: "wait".into(), wait: Some(1), ..Default::default() };
         assert_eq!(perform(&a).unwrap(), None);
+    }
+
+    #[test]
+    fn doctor_classifies_targets() {
+        assert_eq!(check_target("steam://open/main").0, None);
+        assert_eq!(check_target("ms-settings:sound").0, None);
+        assert_eq!(check_target("https://tauri.app/x?y=1").0, None);
+        assert_eq!(check_target("").0, Some(false));
+        let here = std::env::current_dir().unwrap();
+        let (ok, detail) = check_target(&here.display().to_string());
+        assert_eq!(ok, Some(true), "{detail}");
+        let missing = here.join("definitely-not-here.exe").display().to_string();
+        let (ok, detail) = check_target(&missing);
+        assert_eq!(ok, Some(false));
+        assert!(detail.starts_with("not found:"), "{detail}");
+        assert_eq!(check_target("%FAY_UNSET_VAR_X%\\a.exe").0, Some(false));
     }
 
     #[cfg(target_os = "windows")]

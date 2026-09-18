@@ -429,3 +429,30 @@ bookmark walking, `TileAction` camelCase/flatten deserialization, and
 and `wait`. `cargo test` runs on the Windows CI job because the crate needs
 GTK to build on Linux. Both suites are green; no new product bugs surfaced,
 which is the point — the previous round's `@` bug was the kind these catch.
+
+### 2026-09-18 — Phase 27: Doctor tile + full config validation
+Two things that make the owner's first Windows run cheap to report. (1) A
+`kind: "doctor"` tile calls a `doctor` command that returns rows — config
+path, each launch tile's target classified as *exists / on PATH / not found*
+(protocol links only noted), PowerShell / PowerToys / SoundVolumeView /
+Everything / nvidia-smi on PATH, clipboard watcher and bookmark counts, voice
+host state, AI key present (Ollama pinged with a 2 s timeout). The frontend
+prefixes config problems and renders it in the answer panel; **Enter copies
+the report**. (2) `validateConfig` now checks the `app` block (types, ranges,
+enumerations, `ai` sub-keys) and flags unknown keys at root / app / ai / tile
+level with a *did you mean* hint (edit distance ≤ 2, ≤ 3 for keys of 8+
+chars). Bundled config + all packs validate clean, and the tests assert that
+so a future pack can't ship a typo.
+
+### 2026-09-18 — Debug round 6: results mode was invisible (class clash)
+Rendering the Doctor panel to a PNG showed an empty screen with the report in
+the DOM. Cause: the body's results-mode state class was `results`, which also
+matched the panel's own `.results { display: none }` rule — so `body` itself
+was `display: none` in every results mode (`>` files, `@` bookmarks,
+clipboard, AI answers) since Phase 20. The state class is now `in-results`
+(like `in-folder`), and both test suites assert the panel is *painted* (a
+non-zero box under a non-collapsed body), not just present in the DOM.
+Lesson recorded as a rule: a body state class must never share a name with
+a component class; and any new panel gets a painted-on-screen check, since
+DOM-only assertions passed for four rounds while nothing was visible. This
+alone justifies v0.2.2 — v0.2.1 ships the bug.

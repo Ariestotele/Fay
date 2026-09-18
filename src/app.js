@@ -36,7 +36,8 @@ const invoke =
 // say:     text is spoken (voice); listen: tap-to-talk, say a tile's name
 // ask:     screen-aware question (captures the window in front, then asks)
 // add:     "browse…" picker that appends an app tile to your config
-const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder", "focus", "clipboard", "say", "listen", "ask", "add"]);
+// doctor:  self-check report (paths, tools, voice, AI) — Enter copies it
+const KINDS = new Set(["launch", "system", "media", "snippet", "multi", "close", "folder", "focus", "clipboard", "say", "listen", "ask", "add", "doctor"]);
 const SYSTEM_ACTIONS = new Set(["lock", "sleep", "hibernate", "restart", "shutdown", "logoff", "recycle", "darkmode"]);
 const MEDIA_ACTIONS = new Set(["playpause", "play", "pause", "next", "prev", "previous", "stop", "mute", "volup", "voldown"]);
 const CONFIRM_ACTIONS = new Set(["restart", "shutdown", "logoff", "hibernate"]);
@@ -290,7 +291,7 @@ function updateResults(raw) {
 function renderResults(rows) {
   search.rows = rows || [];
   search.sel = 0;
-  document.body.classList.toggle("results", !!rows);
+  document.body.classList.toggle("in-results", !!rows);
   if (!rows) { els.results.innerHTML = ""; return; }
   if (!rows.length) {
     els.results.innerHTML = `<div class="row row--empty">${escapeHtml(search.emptyMsg || "no results")}</div>`;
@@ -472,7 +473,7 @@ async function runPlan(actions) {
 function showAnswer(text, meta) {
   ai.answerShown = true;
   search.mode = "ask";
-  document.body.classList.add("results");
+  document.body.classList.add("in-results");
   els.results.innerHTML = `<div class="row row--answer"><div class="answer__text">${escapeHtml(text)}</div>${meta ? `<div class="answer__meta">${escapeHtml(meta)}</div>` : ""}</div>`;
 }
 function clearAnswer() { ai.answerShown = false; ai.screen = false; search.mode = null; renderResults(null); }
@@ -557,6 +558,51 @@ async function addAppTile() {
     flash(`added ${base} — reloading`);
     setTimeout(() => location.reload(), 600);
   } catch (e) { warn(`save: ${e}`); }
+}
+
+// ---- doctor: first-run self-check -------------------------------------------
+// Everything CI can't verify, in one report: config problems, whether each
+// tile's target exists, helper tools on PATH, voice host, AI. Enter copies it
+// so the owner can paste it into a chat instead of clicking every tile.
+const doctor = { report: "", problems: [] };
+async function runDoctor() {
+  const cfg = ai.cfg || {};
+  const rows = [];
+  const info = (name, detail) => rows.push({ name, ok: null, detail });
+  const check = (name, ok, detail) => rows.push({ name, ok: !!ok, detail });
+  info("Fay", invoke ? "installed app" : "browser preview");
+  if (doctor.problems.length) doctor.problems.forEach((p) => check("config", false, p));
+  else check("config", true, "no problems found");
+  const tiles = allTiles(cfg);
+  info("deck", `${tiles.length} tiles · packs: ${(cfg.packs || []).join(", ") || "none"}`);
+  const targets = tiles
+    .filter((t) => kindOf(t) === "launch" && t.target && !isQuicklink(t))
+    .map((t) => ({ name: t.name || t.id, target: String(t.target) }));
+  const label = "Doctor";
+  showAnswer("checking…");
+  search.mode = "doctor";
+  if (invoke) {
+    try {
+      const be = await invoke("doctor", { targets, es: search.es });
+      for (const r of be) rows.push(r);
+    } catch (e) { check("backend", false, String(e)); }
+  } else {
+    info("backend", `${targets.length} tile targets, tools, voice and AI are checked in the installed app`);
+    info("voice", voice.on ? "on" : "off (app.voice)");
+    info("AI", ai.status || "not started");
+  }
+  const mark = (r) => (r.ok === true ? "✓" : r.ok === false ? "✗" : "·");
+  doctor.report = rows.map((r) => `${mark(r)} ${r.name}: ${r.detail}`).join("\n");
+  const bad = rows.filter((r) => r.ok === false).length;
+  showAnswer(doctor.report, `${label} · ${bad ? `${bad} problem${bad === 1 ? "" : "s"}` : "all good"} · Enter copies the report · Esc closes`);
+  search.mode = "doctor";
+  if (window.Heart) window.Heart.pulse();
+}
+async function copyDoctorReport() {
+  if (!doctor.report) return;
+  if (!invoke) { flash("(preview) would copy the report"); return; }
+  try { await invoke("set_clipboard", { text: doctor.report }); flash("report copied — paste it anywhere"); }
+  catch (e) { warn(`copy: ${e}`); }
 }
 
 // ---- voice (Windows System.Speech via the backend) -------------------------
@@ -792,6 +838,7 @@ async function fire(item, query) {
   if (kind === "focus") { fireFocus(item); return; }
   if (kind === "clipboard") { openClipboard(); return; }
   if (kind === "add") { addAppTile(); return; }
+  if (kind === "doctor") { runDoctor(); return; }
   if (kind === "launch" && !item.target) return;
   if ((kind === "say" || kind === "listen") && !voice.on) { warn(`"${item.name}" needs "voice": true in app`); return; }
   const payload = actionOf(item, query);
@@ -965,7 +1012,7 @@ function wireInput() {
     if (e.key === "Escape") {
       if (isOpen()) {
         if (filterText) setFilter("");
-        else if (search.mode === "ask") clearAnswer();
+        else if (search.mode === "ask" || search.mode === "doctor") clearAnswer();
         else if (clipMode()) closeClipboard();
         else if (inFolder()) closeFolder();
         else closeDeck();
@@ -980,6 +1027,13 @@ function wireInput() {
     const plain = !e.ctrlKey && !e.altKey && !e.metaKey;
     // Results mode: arrows pick a row, Enter opens it, Shift+Enter = alternate.
     if (search.mode) {
+      // Doctor report: Enter copies it; typing anything else leaves it.
+      if (search.mode === "doctor") {
+        if (e.key === "Enter") { copyDoctorReport(); e.preventDefault(); return; }
+        if (e.key === "Backspace") { clearAnswer(); e.preventDefault(); return; }
+        if (e.key.length === 1 && plain) { clearAnswer(); setFilter(e.key); e.preventDefault(); }
+        return;
+      }
       if (search.mode === "ask") {
         if (e.key === "Enter") {
           const q = filterText.replace(/^\?\s*/, "");
@@ -1130,16 +1184,41 @@ function applyPacks(cfg, packs) {
   }
 }
 
+// Every key the code reads, so a typo ("hotkeys", "audioOutput") is reported
+// instead of silently ignored. Keys starting with "_" are comments.
+const TILE_KEYS = new Set(["id", "name", "glyph", "icon", "hint", "target", "elevated", "audioOut", "hotkey", "closeHotkey", "closes", "say", "kind", "action", "text", "paste", "actions", "wait", "children", "minutes", "keyword", "process", "confirm"]);
+const APP_KEYS = new Set(["name", "tagline", "columns", "hotkey", "mouseSummon", "summonOn", "autostart", "accent", "backdrop", "startHidden", "stats", "statsInterval", "clipboard", "clipboardMax", "bookmarks", "files", "everything", "voice", "voiceRate", "voiceName", "voiceConfirm", "ai", "addTile"]);
+const AI_KEYS = new Set(["provider", "model", "apiKey", "ollamaUrl", "useEnvKey"]);
+const ROOT_KEYS = new Set(["app", "scenes", "apps", "system", "packs", "commands", "machines", "$schema"]);
+// Nearest known key within two edits, for the "did you mean" hint.
+function didYouMean(key, known) {
+  const dist = (a, b) => {
+    a = a.toLowerCase(); b = b.toLowerCase();
+    let prev = [...Array(b.length + 1).keys()];
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  };
+  let best = null, bd = key.length >= 8 ? 4 : 3; // longer keys tolerate a longer typo ("audioOutput")
+  for (const k of known) { const d = dist(key, k); if (d < bd) { bd = d; best = k; } }
+  return best ? ` (did you mean "${best}"?)` : "";
+}
+
 // Structural checks with useful messages (a syntax error is caught earlier).
 function validateConfig(cfg, packs) {
   const p = [];
   const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
   if (!isObj(cfg)) return ["config root must be an object { … }"];
+  for (const key of Object.keys(cfg)) if (!ROOT_KEYS.has(key) && !key.startsWith("_")) p.push(`unknown top-level key "${key}"${didYouMean(key, ROOT_KEYS)}`);
   if ("app" in cfg && !isObj(cfg.app)) p.push(`"app" must be an object`);
+  else if (cfg.app) checkApp(cfg.app, p);
   const ids = new Set();
   // One tile action (a tile itself, or a step of a multi-action tile).
   const checkAction = (t, who, isStep) => {
-    if (t.kind && !KINDS.has(t.kind)) p.push(`${who}: unknown kind "${t.kind}" (launch, system, media, snippet, multi, close)`);
+    if (t.kind && !KINDS.has(t.kind)) p.push(`${who}: unknown kind "${t.kind}"${didYouMean(t.kind, KINDS) || ` (${[...KINDS].join(", ")})`}`);
     const k = kindOf(t);
     if (k === "launch" && !t.target) p.push(`${who} needs a "target"`);
     if (k === "system" && !SYSTEM_ACTIONS.has(t.action)) p.push(`${who}: system action must be one of ${[...SYSTEM_ACTIONS].join("/")}`);
@@ -1149,7 +1228,8 @@ function validateConfig(cfg, packs) {
     if (k === "focus" && !(t.minutes > 0) && t.action !== "stop") p.push(`${who} needs "minutes": 25 (or "action": "stop")`);
     if (k === "clipboard" && isStep) p.push(`${who}: a step can't open the clipboard`);
     if (k === "say" && typeof t.text !== "string") p.push(`${who} needs "text" to say`);
-    if ((k === "ask" || k === "add") && isStep) p.push(`${who}: a step can't be "${k}"`);
+    if ((k === "ask" || k === "add" || k === "doctor") && isStep) p.push(`${who}: a step can't be "${k}"`);
+    for (const key of Object.keys(t)) if (!TILE_KEYS.has(key) && !key.startsWith("_")) p.push(`${who}: unknown key "${key}"${didYouMean(key, TILE_KEYS)}`);
     if (t.say != null && typeof t.say !== "string") p.push(`${who}: "say" must be a string`);
     if (k === "multi") {
       if (!t.actions.length) p.push(`${who}: "actions" is empty`);
@@ -1190,6 +1270,36 @@ function validateConfig(cfg, packs) {
   }
   if ("machines" in cfg && !isObj(cfg.machines)) p.push(`"machines" must be an object`);
   return p;
+}
+
+// The `app` block: types, ranges and enumerations for every setting.
+function checkApp(app, p) {
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const bad = (k, want) => p.push(`app.${k} must be ${want}`);
+  for (const key of Object.keys(app)) if (!APP_KEYS.has(key) && !key.startsWith("_")) p.push(`unknown app key "${key}"${didYouMean(key, APP_KEYS)}`);
+  for (const k of ["autostart", "startHidden", "stats", "clipboard", "bookmarks", "files", "voice", "voiceConfirm", "addTile"]) {
+    if (k in app && typeof app[k] !== "boolean") bad(k, "true or false");
+  }
+  for (const k of ["name", "tagline", "hotkey", "voiceName", "everything"]) {
+    if (k in app && typeof app[k] !== "string") bad(k, "a string");
+  }
+  if ("mouseSummon" in app && app.mouseSummon != null && typeof app.mouseSummon !== "string") bad("mouseSummon", `a string like "Ctrl+Mouse5" (or null)`);
+  if ("summonOn" in app && !["cursor", "current"].includes(app.summonOn)) bad("summonOn", `"cursor" or "current"`);
+  if ("accent" in app && !(app.accent === "auto" || /^#[0-9a-f]{6}$/i.test(String(app.accent)))) bad("accent", `"auto" or "#rrggbb"`);
+  if ("backdrop" in app && !(typeof app.backdrop === "number" && app.backdrop >= 0 && app.backdrop <= 1)) bad("backdrop", "a number from 0 to 1");
+  if ("columns" in app && !(Number.isInteger(app.columns) && app.columns > 0)) bad("columns", "a whole number");
+  if ("statsInterval" in app && !(typeof app.statsInterval === "number" && app.statsInterval >= 1000)) bad("statsInterval", "milliseconds (1000 or more)");
+  if ("clipboardMax" in app && !(Number.isInteger(app.clipboardMax) && app.clipboardMax > 0)) bad("clipboardMax", "a whole number");
+  if ("voiceRate" in app && !(typeof app.voiceRate === "number" && app.voiceRate >= -10 && app.voiceRate <= 10)) bad("voiceRate", "a number from -10 to 10");
+  if ("ai" in app && app.ai !== false) {
+    if (!isObj(app.ai)) { bad("ai", "an object { provider, model, apiKey, ollamaUrl } or false"); return; }
+    const a = app.ai;
+    for (const key of Object.keys(a)) if (!AI_KEYS.has(key) && !key.startsWith("_")) p.push(`unknown app.ai key "${key}"${didYouMean(key, AI_KEYS)}`);
+    if ("provider" in a && !["anthropic", "ollama"].includes(String(a.provider).toLowerCase())) bad("ai.provider", `"anthropic" or "ollama"`);
+    for (const k of ["model", "apiKey", "ollamaUrl"]) if (k in a && typeof a[k] !== "string") bad(`ai.${k}`, "a string");
+    if (typeof a.ollamaUrl === "string" && a.ollamaUrl && !/^https?:\/\//i.test(a.ollamaUrl)) bad("ai.ollamaUrl", `a URL like "http://localhost:11434"`);
+    if ("useEnvKey" in a && typeof a.useEnvKey !== "boolean") bad("ai.useEnvKey", "true or false");
+  }
 }
 
 // Per-machine overrides: cfg.machines[<HOSTNAME>].tiles[<id>] is merged onto
@@ -1236,6 +1346,7 @@ async function main() {
     const [{ cfg, raw, seeded, path, broken }, packs] = await Promise.all([loadConfig(), loadPacks()]);
     ai.raw = raw && !broken ? raw : null; // the untouched user config (for "+ Add app")
     const problems = validateConfig(cfg, packs);
+    doctor.problems = problems;
     applyPacks(cfg, packs);
     await applyCommandsFolder(cfg);
     window.__fayHost = await applyMachineProfile(cfg);
