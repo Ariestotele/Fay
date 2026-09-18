@@ -4,6 +4,7 @@
     "tagline": "command deck",
     "columns": 4,
     "hotkey": "Ctrl+Alt+Space",
+    "mouseSummon": "Ctrl+Mouse5",
     "autostart": false,
     "accent": "auto",
     "backdrop": 0.62,

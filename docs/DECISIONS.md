@@ -234,3 +234,14 @@ from the Releases page (no toolchain), a feature table, the config with a
 complete key reference, scenes in three steps, and pointers into `docs/`. The
 deep material stays in SETUP/ARCHITECTURE/DECISIONS/STATE; the README only has
 to get someone from "what is this" to "it's running" fast.
+
+### 2026-09-18 — Phase 16: Ctrl+Mouse5 summon via WH_MOUSE_LL
+Supersedes the "deferred" entry. A `mouse_summon` module installs a low-level
+mouse hook on its own thread (with the message loop LL hooks require) using
+`windows-sys`. On WM_XBUTTONDOWN it compares the X button and live modifier
+state (`GetAsyncKeyState`) against `app.mouseSummon` (parsed from strings like
+"Ctrl+Mouse5"; Mouse4 = XBUTTON1, Mouse5 = XBUTTON2), toggles the window on the
+main thread via `run_on_main_thread`, and returns 1 to swallow the click. The
+combo lives in a static `Mutex` set by `set_mouse_summon`; the hook is
+installed once at startup and is inert until a combo is set. Windows-only
+(`cfg(windows)` dependency and module).

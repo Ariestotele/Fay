@@ -44,7 +44,7 @@ Notepad. Save, then tray › **Reload config**.
 ```json
 {
   "app": {
-    "hotkey": "Ctrl+Alt+Space", "accent": "auto", "backdrop": 0.62,
+    "hotkey": "Ctrl+Alt+Space", "mouseSummon": "Ctrl+Mouse5", "accent": "auto", "backdrop": 0.62,
     "startHidden": true, "autostart": false
   },
   "scenes": [
@@ -67,6 +67,7 @@ Notepad. Save, then tray › **Reload config**.
 | Key | On | Meaning |
 | :-- | :-- | :-- |
 | `hotkey` | `app` | Summon combo. Keyboard only (`Ctrl`, `Alt`, `Shift`, `Super`, `CmdOrCtrl` + key). |
+| `mouseSummon` | `app` | Mouse-button summon, e.g. `"Ctrl+Mouse5"` (`Mouse4`/`Mouse5` + `Ctrl`/`Alt`/`Shift`). `""` = off. |
 | `accent` | `app` | `"auto"` = follow Windows accent, or a `#rrggbb`. |
 | `backdrop` | `app` | 0–1, how much the wallpaper is dimmed behind the Heart. |
 | `startHidden` | `app` | Start in the tray (default `true`). |

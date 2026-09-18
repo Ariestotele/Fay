@@ -237,8 +237,8 @@ Set `app.hotkey` in `apps.config.json` — no rebuild needed, just refresh:
 
 Accepted modifiers: `Ctrl`/`Control`, `CmdOrCtrl`/`CommandOrControl`, `Alt`,
 `Shift`, `Super` (the Win key). Combine with `+` and a key, e.g.
-`CmdOrCtrl+Shift+Space`, `Alt+Backquote`. **Keyboard only** — mouse buttons such
-as Mouse5 aren't supported (see "Summon by mouse button" below). An invalid
+`CmdOrCtrl+Shift+Space`, `Alt+Backquote`. Keyboard combos only here — for a
+mouse button use `mouseSummon` (see "Summon by mouse button" below). An invalid
 string is ignored and Fay falls back to the built-in `Ctrl+Alt+Space`.
 
 ## Launch at login (autostart)
@@ -280,12 +280,19 @@ so they switch; Discord uses its own device selection (or the Communications
 default), so it keeps playing/recording where it was. If you *want* Discord to
 follow too, pin a device in Discord's voice settings rather than using "Default".
 
-## Summon by mouse button (Ctrl+Mouse5)?
+## Summon by mouse button (Ctrl+Mouse5)
 
-Not supported yet. Tauri's global-shortcut system is **keyboard-only**, so mouse
-buttons can't be bound the way `Ctrl+Alt+Space` is. Doing it properly needs a
-low-level Windows mouse hook (raw input) running alongside the app — tracked as a
-future enhancement. For now the summon hotkey stays **Ctrl+Alt+Space**.
+Set `app.mouseSummon` in the config:
+
+```json
+"app": { "mouseSummon": "Ctrl+Mouse5" }
+```
+
+`Mouse4` (back) or `Mouse5` (forward), optionally with `Ctrl` / `Alt` / `Shift`.
+Pressing the combo toggles Fay exactly like the keyboard hotkey; the click is
+swallowed so the app under the cursor doesn't also react to it. Set it to `""`
+to turn it off. (Implemented with a low-level Windows mouse hook, since the
+keyboard-hotkey system can't bind mouse buttons.)
 
 ## Reference: app targets & links
 
