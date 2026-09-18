@@ -135,3 +135,13 @@ merge. Installing
 that artifact is the documented first-choice way to try Fay; source builds are
 for development only. NSIS only (no MSI) to keep the job fast and avoid the WiX
 download.
+
+### 2026-09-18 — Phase 8: direct scene/app hotkeys
+Any tile may carry a `hotkey`; pressing it fires the tile (target + `audioOut`)
+without opening Fay. All global shortcuts now live in one `HotkeyState` (summon
++ item bindings) and are re-registered together via `apply_hotkeys`, so
+changing the summon combo no longer wipes item hotkeys (the old
+`set_summon_hotkey` unregistered everything). The global handler matches the
+pressed shortcut against the bindings first and falls back to toggling the
+window. Conflicting combos are skipped, unparseable ones reported. Default:
+scenes on `Ctrl+Alt+1/2/3`.

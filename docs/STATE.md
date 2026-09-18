@@ -3,9 +3,9 @@
 > Update this at the end of every session. New chats read this first.
 
 **Last updated:** 2026-09-18
-**Current phase:** Phases 1–6 merged to `main` (all CI-green). **Not yet
-runtime-tested by the owner.** Phase 7 (CI-built installer) in PR so the owner
-can test without installing Rust/Node.
+**Current phase:** Phases 1–7 merged to `main` (all CI-green). **Phase 8 (direct
+scene/app hotkeys) in PR.** Build-day queue in progress (see Pipeline). Owner has
+not yet runtime-tested; installer artifacts are available per push.
 
 ## ✅ Done (all merged)
 
@@ -18,6 +18,8 @@ can test without installing Rust/Node.
 | 4 | Config-driven summon hotkey (`app.hotkey`, `set_summon_hotkey`) |
 | 5 | Autostart at login (`app.autostart`, tauri-plugin-autostart) |
 | 6 | **The Heart** — full-monitor translucent overlay, `<canvas>` particle HUD (layered multi-speed rings + inner set + pulsing particle sphere as the open button), `accent: "auto"` (Windows accent via `get_accent_color`), `backdrop` alpha |
+| 7 | CI-built NSIS installer artifact on every push/PR (`Fay-windows-installer`) — test without a toolchain |
+| 8 | Direct scene/app hotkeys — per-tile `hotkey` fires the tile (with `audioOut`) without opening Fay; unified `HotkeyState` (in PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -42,9 +44,9 @@ can test without installing Rust/Node.
 
 | Feature | Value | Notes |
 | :-- | :-- | :-- |
-| Direct scene hotkeys (`Ctrl+Alt+1` → Game) | high | fire a scene without opening Fay; per-scene `hotkey` in config |
+| Number-key launch + type-to-filter | med | frontend-only quick wins — **next** |
+| GitHub Release workflow (v0.1.0) | med | installer attached to a Releases page |
 | Real app icons | high | extract each app's icon instead of glyphs |
-| Number-key launch + type-to-filter | med | frontend-only quick wins |
 | Per-machine profiles | med | different paths per PC; fixes absolute-path portability |
 | Running-app indicator | med | dot on apps already open |
 | First-run path picker | med | "browse…" to capture exe paths |
