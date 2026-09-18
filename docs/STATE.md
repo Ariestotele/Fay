@@ -42,7 +42,8 @@ the workflows now clear old bundles before building.)
 | 20 | **Batch 4 / search** — results mode (rows replace the grid): `>` files via Everything `es.exe` (`app.everything`), `@` browser bookmarks (Zen/Firefox jsonlz4 + Chromium JSON, `lz4_flex`), clipboard history (memory only, `kind: "clipboard"` tile + `Ctrl+Alt+V`, Enter pastes) (in PR) |
 | 21 | **Batch 5 / voice** — persistent `System.Speech` PowerShell process (`voice_config`, `say`, `listen`, `set_voice_grammar`); per-tile `say`, `kind: "say"` / `"listen"` tiles; grammar from tile names; `Heart.talk/listen`; `app.voice*` |
 | 22 | **Batch 6 / AI + picker** — natural-language bar (Enter on no-match or `?`), JSON plan → `TileAction` multi, bounded retry loop, destructive gate; screen-aware ask (`kind: "ask"`, `Ctrl+Alt+A`, capture-before-show); Anthropic or Ollama (`app.ai`); `+ Add app` picker (`pick_file`, `addTile`); debug round 2 (`-EncodedCommand`, history normalization, confirm gates) |
-| 23 | **Debug round 3 / first real render** — `docs/render-preview.js` screenshots the real frontend in headless Chromium; fixed the Heart drawn at ¼ size, `accent: "auto"` parsing as black, a duplicate tile id, and deck overflow (hint clamp, scrolling deck). `docs/ui-preview.png` + `ui-deck.png` are real renders now (in PR) |
+| 23 | **Debug round 3 / first real render** — `docs/render-preview.js` screenshots the real frontend in headless Chromium; fixed the Heart drawn at ¼ size, `accent: "auto"` parsing as black, a duplicate tile id, and deck overflow (hint clamp, scrolling deck). `docs/ui-preview.png` + `ui-deck.png` are real renders now |
+| 24 | **Heart polish (owner-approved variant B + extras)** — soft halo under both bands, tighter band cores, brighter sphere core with bloom, clock tucked into the sphere's rim, wordmark at half opacity, quieter tile borders/glass so the Heart reads through the deck (in PR) |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 

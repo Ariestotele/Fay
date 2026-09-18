@@ -145,6 +145,15 @@
     if (t < listenUntil) pulseT = Math.max(pulseT, 0.3 + 0.25 * Math.sin(t * 3));             // listening
     const bt = Math.min(1, beat(t) + pulseT);
 
+    // soft halo under the bands — gives the rings volume without any solid line
+    const halo = (rr, w, a) => {
+      const g = ctx.createRadialGradient(cx, cy, Math.max(0, rr - w), cx, cy, rr + w);
+      g.addColorStop(0, col(accent, 0)); g.addColorStop(0.5, col(accent, a)); g.addColorStop(1, col(accent, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, rr + w, 0, 6.283); ctx.fill();
+    };
+    halo(R * 0.98, R * 0.16, 0.07 + 0.03 * bt);
+    halo(R * 0.71, R * 0.10, 0.04);
+
     // rings
     for (const p of rings) {
       p.a += p.speed * dt;
@@ -152,7 +161,7 @@
       const r = baseR * (1 + p.amp * Math.sin(p.k * p.a)) + p.off * p.thFrac * R;
       const x = cx + r * Math.cos(p.a), y = cy + r * Math.sin(p.a);
       const close = 1 - Math.min(1, Math.abs(p.off));
-      const a = (0.05 + 0.7 * close) * p.bright * (0.4 + 0.6 * p.b) * (1 + 0.5 * pulseT);
+      const a = (0.04 + 0.8 * Math.pow(close, 1.6)) * p.bright * (0.45 + 0.55 * p.b) * (1 + 0.5 * pulseT);
       ctx.fillStyle = col(p.lite ? light : accent, Math.min(1, a));
       ctx.beginPath(); ctx.arc(x, y, p.sz, 0, 6.283); ctx.fill();
     }
@@ -160,10 +169,14 @@
     if (progress != null) drawProgress();
     if (stats && showStats) drawStats();
 
-    // soft glow behind the ball
+    // soft glow behind the ball, plus a tight bloom at its core
     const Rs = R * 0.17 * (1 + 0.10 * bt + 0.25 * pulseT);
     ctx.fillStyle = col(accent, 0.05 + 0.04 * bt + 0.12 * pulseT);
     ctx.beginPath(); ctx.arc(cx, cy, Rs * 2.4, 0, 6.283); ctx.fill();
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, Rs * 0.55);
+    core.addColorStop(0, col(light, 0.22 + 0.18 * bt));
+    core.addColorStop(1, col(accent, 0));
+    ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, Rs * 0.55, 0, 6.283); ctx.fill();
 
     // particle sphere
     for (const s of sphere) {
@@ -174,7 +187,7 @@
       const y3 = rad * sinth * Math.sin(s.ph);
       const z3 = rad * Math.cos(s.th);
       const front = (z3 / Rs + 1) / 2;
-      const a = Math.min(0.95, (0.10 + 0.8 * front) * (0.4 + 0.6 * s.b) * (0.8 + 0.4 * bt));
+      const a = Math.min(0.95, (0.10 + 0.8 * front) * (0.4 + 0.6 * s.b) * (0.8 + 0.4 * bt) * (1.25 - 0.45 * s.rr));
       ctx.fillStyle = col(s.lite ? light : accent, a);
       ctx.beginPath(); ctx.arc(cx + x3, cy + y3, s.sz * (0.5 + front), 0, 6.283); ctx.fill();
     }
