@@ -543,12 +543,20 @@ struct StatsState {
 }
 type StatsMutex = std::sync::Mutex<StatsState>;
 
+/// Set once nvidia-smi has failed: on an AMD/Intel machine it is absent, and
+/// the stats poll would otherwise spawn a doomed process every few seconds for
+/// as long as Fay runs. The GPU readouts simply stay blank instead.
+static NO_NVIDIA: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn gpu_stats() -> (Option<f32>, Option<f32>) {
+    if NO_NVIDIA.load(std::sync::atomic::Ordering::Relaxed) {
+        return (None, None);
+    }
     let out = cmd("nvidia-smi")
         .args(["--query-gpu=utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"])
         .output();
-    if let Ok(o) = out {
-        if o.status.success() {
+    match out {
+        Ok(o) if o.status.success() => {
             let s = String::from_utf8_lossy(&o.stdout);
             let mut it = s
                 .lines()
@@ -556,10 +564,16 @@ fn gpu_stats() -> (Option<f32>, Option<f32>) {
                 .unwrap_or("")
                 .split(',')
                 .map(|x| x.trim().parse::<f32>().ok());
-            return (it.next().flatten(), it.next().flatten());
+            (it.next().flatten(), it.next().flatten())
         }
+        // Not installed (spawn failed) — never try again this run. A non-zero
+        // exit is left retryable: the driver may just be busy.
+        Err(_) => {
+            NO_NVIDIA.store(true, std::sync::atomic::Ordering::Relaxed);
+            (None, None)
+        }
+        _ => (None, None),
     }
-    (None, None)
 }
 
 #[tauri::command]
@@ -1176,22 +1190,142 @@ $xml.LoadXml("<toast><visual><binding template='ToastGeneric'><text>{t}</text><t
 // The frontend renders the rows and copies the report on Enter.
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DoctorTarget {
+    #[serde(default)]
+    id: String,
     name: String,
     target: String,
+    /// Search the machine for this app when its target is missing. Off for
+    /// scene tiles: those point at a PowerToys Workspace shortcut the owner
+    /// creates, so any same-named app found elsewhere would be the wrong file.
+    #[serde(default)]
+    find: bool,
+    /// Appended to the row when the target is missing and nothing was found.
+    #[serde(default)]
+    missing_hint: Option<String>,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
 struct DoctorRow {
     /// Check label, e.g. "tile Zen" or "tool es.exe".
     name: String,
     /// true = ok, false = problem, None = informational.
     ok: Option<bool>,
     detail: String,
+    /// A working path found for a tile whose target is missing, and the tile
+    /// it belongs to: together these let the frontend repair the config.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tile_id: Option<String>,
 }
 
 fn row(name: &str, ok: Option<bool>, detail: impl Into<String>) -> DoctorRow {
-    DoctorRow { name: name.to_string(), ok, detail: detail.into() }
+    DoctorRow { name: name.to_string(), ok, detail: detail.into(), ..Default::default() }
+}
+
+/// How well a file's stem matches the tile name: 0 = exact, 1 = prefix,
+/// 2 = contains. `None` = not a match at all, or an uninstaller.
+fn match_score(stem: &str, want: &str) -> Option<u8> {
+    let s = stem.trim().to_ascii_lowercase();
+    let w = want.trim().to_ascii_lowercase();
+    if w.is_empty() || s.is_empty() || s.contains("uninstall") {
+        return None;
+    }
+    if s == w {
+        Some(0)
+    } else if s.starts_with(&w) {
+        Some(1)
+    } else if s.contains(&w) {
+        Some(2)
+    } else {
+        None
+    }
+}
+
+/// Walk `dir` for a file matching `want`, keeping the best score seen.
+/// Depth- and entry-budgeted so scanning Program Files can't run away.
+fn walk_for(
+    dir: &std::path::Path,
+    want: &str,
+    exts: &[&str],
+    depth: u32,
+    budget: &mut u32,
+    best: &mut Option<(u8, String)>,
+) {
+    if depth == 0 || *budget == 0 || matches!(best, Some((0, _))) {
+        return;
+    }
+    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    for entry in rd.flatten() {
+        if *budget == 0 {
+            return;
+        }
+        *budget -= 1;
+        let Ok(ft) = entry.file_type() else { continue };
+        let p = entry.path();
+        if ft.is_dir() {
+            walk_for(&p, want, exts, depth - 1, budget, best);
+            if matches!(best, Some((0, _))) {
+                return;
+            }
+            continue;
+        }
+        let ext = p.extension().and_then(|x| x.to_str()).unwrap_or("").to_ascii_lowercase();
+        if !exts.contains(&ext.as_str()) {
+            continue;
+        }
+        let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let Some(score) = match_score(stem, want) else { continue };
+        if best.as_ref().map_or(true, |(b, _)| score < *b) {
+            *best = Some((score, p.display().to_string()));
+            if score == 0 {
+                return;
+            }
+        }
+    }
+}
+
+/// Find where an app actually lives, by tile name. Start Menu shortcuts are
+/// tried first: they carry the right working directory and arguments, which is
+/// why the Discord tile works while guessed `.exe` paths go stale on update.
+fn find_app(name: &str) -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut best: Option<(u8, String)> = None;
+        let mut budget: u32 = 40_000;
+        for (var, sub) in [
+            ("APPDATA", "Microsoft\\Windows\\Start Menu\\Programs"),
+            ("ProgramData", "Microsoft\\Windows\\Start Menu\\Programs"),
+        ] {
+            if let Ok(d) = std::env::var(var) {
+                walk_for(&std::path::Path::new(&d).join(sub), name, &["lnk"], 4, &mut budget, &mut best);
+            }
+        }
+        if best.is_some() {
+            return best.map(|(_, p)| p);
+        }
+        // No shortcut: look for the exe in the usual install roots.
+        for (var, sub) in [
+            ("LOCALAPPDATA", "Programs"),
+            ("LOCALAPPDATA", ""),
+            ("ProgramFiles", ""),
+            ("ProgramFiles(x86)", ""),
+        ] {
+            if let Ok(d) = std::env::var(var) {
+                let root = std::path::Path::new(&d).join(sub);
+                walk_for(&root, name, &["exe"], 3, &mut budget, &mut best);
+            }
+        }
+        best.map(|(_, p)| p)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = name;
+        None
+    }
 }
 
 /// Where a command resolves on PATH (Windows `where.exe`), if anywhere.
@@ -1265,9 +1399,29 @@ async fn doctor(app: tauri::AppHandle, targets: Vec<DoctorTarget>, es: Option<St
     }
 
     // Tile targets: the checks the owner otherwise does by clicking each tile.
+    // A missing one triggers a search, so the report says where the app really
+    // is instead of only that the guess was wrong.
     for t in &targets {
         let (ok, detail) = check_target(&t.target);
-        rows.push(row(&format!("tile {}", t.name), ok, detail));
+        let mut r = row(&format!("tile {}", t.name), ok, detail);
+        if ok == Some(false) {
+            match if t.find { find_app(&t.name) } else { None } {
+                Some(found) => {
+                    r.detail = format!("{} → found: {found}", r.detail);
+                    r.fix = Some(found);
+                    r.tile_id = Some(t.id.clone());
+                }
+                None => {
+                    let hint = t.missing_hint.as_deref().unwrap_or(if t.find {
+                        "not installed anywhere I can see"
+                    } else {
+                        "nothing to search for"
+                    });
+                    r.detail = format!("{} ({hint})", r.detail);
+                }
+            }
+        }
+        rows.push(r);
     }
 
     // Helper tools.
@@ -2441,6 +2595,45 @@ mod tests {
         assert_eq!(ok, Some(false));
         assert!(detail.starts_with("not found:"), "{detail}");
         assert_eq!(check_target("%FAY_UNSET_VAR_X%\\a.exe").0, Some(false));
+    }
+
+    #[test]
+    fn app_name_matching_prefers_exact_and_skips_uninstallers() {
+        assert_eq!(match_score("Zen", "zen"), Some(0));
+        assert_eq!(match_score("Zen Browser", "Zen"), Some(1));
+        assert_eq!(match_score("My Zen Thing", "zen"), Some(2));
+        assert_eq!(match_score("Uninstall Zen", "zen"), None);
+        assert_eq!(match_score("Firefox", "zen"), None);
+        assert_eq!(match_score("Task Manager", "task manager"), Some(0));
+        assert_eq!(match_score("anything", ""), None);
+    }
+
+    #[test]
+    fn walk_for_finds_the_best_match_within_budget() {
+        let dir = std::env::temp_dir().join(format!("fay-walk-{}", std::process::id()));
+        let nested = dir.join("sub");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(nested.join("Zen Browser.lnk"), b"x").unwrap();
+        std::fs::write(nested.join("Uninstall Zen.lnk"), b"x").unwrap();
+        std::fs::write(nested.join("notes.txt"), b"x").unwrap();
+        let mut budget = 1000u32;
+        let mut best = None;
+        walk_for(&dir, "zen", &["lnk"], 4, &mut budget, &mut best);
+        assert!(best.as_ref().unwrap().1.ends_with("Zen Browser.lnk"), "{best:?}");
+        // The exact file wins over the prefix match, whatever the walk order.
+        std::fs::write(nested.join("Zen.lnk"), b"x").unwrap();
+        let (mut budget, mut best) = (1000u32, None);
+        walk_for(&dir, "zen", &["lnk"], 4, &mut budget, &mut best);
+        assert_eq!(best.as_ref().unwrap().0, 0);
+        // Depth 1 never descends into the subfolder.
+        let (mut budget, mut best) = (1000u32, None);
+        walk_for(&dir, "zen", &["lnk"], 1, &mut budget, &mut best);
+        assert!(best.is_none());
+        // A spent budget stops the walk.
+        let (mut budget, mut best) = (0u32, None);
+        walk_for(&dir, "zen", &["lnk"], 4, &mut budget, &mut best);
+        assert!(best.is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[cfg(target_os = "windows")]

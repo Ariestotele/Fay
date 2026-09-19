@@ -468,6 +468,18 @@ runs every check CI can't and shows one report:
 **Enter copies the whole report** to the clipboard — paste it into a chat or an
 issue instead of describing what happens tile by tile. Esc closes it.
 
+### Press F to repair broken paths
+
+When an app tile's `target` is missing, Doctor goes looking for the app: Start
+Menu shortcuts first (they survive updates, which guessed `.exe` paths don't),
+then the usual install roots. Rows that found something say `→ found: …`, and
+the footer offers **F fixes N paths**. Pressing **F** writes those paths into
+your config and reloads — no hand-editing.
+
+Scene tiles are reported but never searched: their `target` is a PowerToys
+Workspace shortcut *you* create, so a same-named app found elsewhere would be
+the wrong file. Those rows point you at the Workspaces editor instead.
+
 ## Config validation
 
 Every key is checked on load. Unknown or misspelled keys (`"hotkeys"`,

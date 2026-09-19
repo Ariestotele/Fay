@@ -45,7 +45,7 @@ Every push to `main` also produces a fresh installer under
 | **Voice** | Offline, built into Windows. Tiles can `say` a reply; press *Listen* and say *"game"* or *"open discord"*. The Heart wobbles while it talks. |
 | **AI** | Type *"game mode but keep audio on speakers"* — Fay's model picks the actions and replies. Screen-aware questions with `Ctrl+Alt+A`. Anthropic API key or local Ollama. |
 | **Add app** | A dashed *+* tile opens a file picker and writes the tile into your config. |
-| **Doctor** | One tile checks every tile path, helper tool, voice and AI setup, and config typos (*did you mean "hotkey"?*). Enter copies the report. ([see it](docs/ui-doctor.png)) |
+| **Doctor** | One tile checks every tile path, helper tool, voice and AI setup, and config typos (*did you mean "hotkey"?*). Enter copies the report; **F repairs** broken app paths by finding where the app really is. ([see it](docs/ui-doctor.png)) |
 | **Real icons** | Each tile shows its app's actual icon, extracted and cached automatically. |
 | **Running dot** | Apps already open get a glowing dot, so a scene doesn't relaunch them by surprise. |
 | **Accent auto** | Colors follow your Windows accent color (or pin a hex). |

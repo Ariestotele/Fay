@@ -564,7 +564,7 @@ async function addAppTile() {
 // Everything CI can't verify, in one report: config problems, whether each
 // tile's target exists, helper tools on PATH, voice host, AI. Enter copies it
 // so the owner can paste it into a chat instead of clicking every tile.
-const doctor = { report: "", problems: [] };
+const doctor = { report: "", problems: [], fixes: [] };
 async function runDoctor() {
   const cfg = ai.cfg || {};
   const rows = [];
@@ -575,9 +575,27 @@ async function runDoctor() {
   else check("config", true, "no problems found");
   const tiles = allTiles(cfg);
   info("deck", `${tiles.length} tiles · packs: ${(cfg.packs || []).join(", ") || "none"}`);
-  const targets = tiles
-    .filter((t) => kindOf(t) === "launch" && t.target && !isQuicklink(t))
-    .map((t) => ({ name: t.name || t.id, target: String(t.target) }));
+  // Scene targets are PowerToys Workspace shortcuts the owner creates, so they
+  // are reported but never searched for — a same-named app would be the wrong
+  // file. App and system tiles name a real program, so those can be located.
+  const targets = [];
+  for (const group of ["scenes", "apps", "system"]) {
+    const visit = (list) => {
+      for (const t of list || []) {
+        if (!t || typeof t !== "object") continue;
+        if (Array.isArray(t.children)) { visit(t.children); continue; }
+        if (kindOf(t) !== "launch" || !t.target || isQuicklink(t)) continue;
+        targets.push({
+          id: t.id || "",
+          name: t.name || t.id,
+          target: String(t.target),
+          find: group !== "scenes",
+          missingHint: group === "scenes" ? "create this scene in PowerToys Workspaces — see SETUP.md" : null,
+        });
+      }
+    };
+    visit(cfg[group]);
+  }
   const label = "Doctor";
   showAnswer("checking…");
   search.mode = "doctor";
@@ -593,16 +611,49 @@ async function runDoctor() {
   }
   const mark = (r) => (r.ok === true ? "✓" : r.ok === false ? "✗" : "·");
   doctor.report = rows.map((r) => `${mark(r)} ${r.name}: ${r.detail}`).join("\n");
+  // Rows where the backend found the app somewhere else can be written back.
+  doctor.fixes = rows.filter((r) => r.fix && r.tileId && findRawTile(r.tileId));
   const bad = rows.filter((r) => r.ok === false).length;
-  showAnswer(doctor.report, `${label} · ${bad ? `${bad} problem${bad === 1 ? "" : "s"}` : "all good"} · Enter copies the report · Esc closes`);
+  const n = doctor.fixes.length;
+  const meta = [
+    label,
+    bad ? `${bad} problem${bad === 1 ? "" : "s"}` : "all good",
+    n ? `F fixes ${n} path${n === 1 ? "" : "s"}` : null,
+    "Enter copies the report",
+    "Esc closes",
+  ].filter(Boolean).join(" · ");
+  showAnswer(doctor.report, meta);
   search.mode = "doctor";
   if (window.Heart) window.Heart.pulse();
+}
+// Only tiles that live in the user's own config can be rewritten (a pack or
+// commands-folder tile isn't in the file, so there is nothing to patch).
+function findRawTile(id) {
+  return ai.raw ? allTiles(ai.raw).find((t) => t.id === id) : null;
 }
 async function copyDoctorReport() {
   if (!doctor.report) return;
   if (!invoke) { flash("(preview) would copy the report"); return; }
   try { await invoke("set_clipboard", { text: doctor.report }); flash("report copied — paste it anywhere"); }
   catch (e) { warn(`copy: ${e}`); }
+}
+// Write every found path back into the user's config and reload. Only the
+// `target` of tiles whose current target is missing is touched.
+async function applyDoctorFixes() {
+  const fixes = doctor.fixes;
+  if (!fixes.length) return;
+  if (!invoke) { flash(`(preview) would fix ${fixes.length} path(s)`); return; }
+  const names = [];
+  for (const f of fixes) {
+    const t = findRawTile(f.tileId);
+    if (t) { t.target = f.fix; names.push(f.name.replace(/^tile /, "")); }
+  }
+  if (!names.length) return;
+  try {
+    await invoke("save_config", { text: JSON.stringify(ai.raw, null, 2) });
+    flash(`fixed ${names.join(", ")} — reloading`);
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { warn(`save: ${e}`); }
 }
 
 // ---- voice (Windows System.Speech via the backend) -------------------------
@@ -1030,6 +1081,7 @@ function wireInput() {
       // Doctor report: Enter copies it; typing anything else leaves it.
       if (search.mode === "doctor") {
         if (e.key === "Enter") { copyDoctorReport(); e.preventDefault(); return; }
+        if ((e.key === "f" || e.key === "F") && doctor.fixes.length) { applyDoctorFixes(); e.preventDefault(); return; }
         if (e.key === "Backspace") { clearAnswer(); e.preventDefault(); return; }
         if (e.key.length === 1 && plain) { clearAnswer(); setFilter(e.key); e.preventDefault(); }
         return;
