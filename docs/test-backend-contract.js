@@ -34,10 +34,15 @@ const answers = {
   search_files: (a) => a.query ? [{ name: "report.pdf", path: "D:\\\\docs\\\\report.pdf", dir: false }] : [],
   list_bookmarks: () => [{ title: "Tauri docs", url: "https://tauri.app", browser: "Zen" }],
   fire: () => null,
+  // Zen is missing but locatable (a fixable row); Focus is a scene, so the
+  // backend is told not to search and the row carries no fix.
   doctor: (a) => [
     { name: "machine", ok: null, detail: "TESTPC · windows" },
-    ...a.targets.map((t) => ({ name: "tile " + t.name, ok: t.name !== "Zen", detail: t.name === "Zen" ? "not found: C:\\\\zen.exe" : "ok" })),
-    { name: "tool es.exe", ok: false, detail: "es.exe not on PATH" },
+    ...a.targets.map((t) => {
+      if (t.name === "Zen") return { name: "tile Zen", ok: false, detail: "not found: C:\\\\old\\\\zen.exe → found: C:\\\\Start Menu\\\\Zen.lnk", fix: "C:\\\\Start Menu\\\\Zen.lnk", tileId: t.id };
+      if (t.name === "Focus") return { name: "tile Focus", ok: false, detail: "not found: Fay-Focus.lnk (" + (t.missingHint || "no hint") + ")" };
+      return { name: "tile " + t.name, ok: true, detail: "ok" };
+    }),
     { name: "AI", ok: true, detail: "anthropic · key set" },
   ],
   set_clipboard: () => null,
@@ -180,10 +185,18 @@ window.__TAURI__ = { core: { invoke: async (cmd, args) => { window.__calls.push(
   const names = (d?.targets || []).map((t) => t.name);
   ok("doctor sends launch targets only (scenes + apps, no quicklinks / multi)", names.includes("Zen") && names.includes("Game") && !names.includes("YouTube") && !names.includes("Wind down"), names.join());
   ok("doctor passes the Everything path from config", d && "es" in d);
+  const byName = Object.fromEntries((d?.targets || []).map((t) => [t.name, t]));
+  ok("app tiles are searchable, scene tiles are not", byName.Zen?.find === true && byName.Game?.find === false, JSON.stringify([byName.Zen?.find, byName.Game?.find]));
+  ok("scene tiles carry the PowerToys hint", /PowerToys/.test(byName.Game?.missingHint || ""), byName.Game?.missingHint);
+  ok("tile ids are sent so a fix knows what to patch", byName.Zen?.id === "zen");
   const report = await page.$eval(".answer__text", (e) => e.textContent);
   ok("report panel is painted on screen", await shown(".answer__text"));
   ok("report lists backend rows with marks", report.includes("✗ tile Zen: not found") && report.includes("· machine: TESTPC") && report.includes("✓ AI:"), report.split("\n").slice(0, 3).join(" / "));
-  ok("report counts problems in the meta line", (await page.$eval(".answer__meta", (e) => e.textContent)).includes("2 problems"));
+  ok("report shows the found path for a fixable tile", report.includes("→ found: C:\\Start Menu\\Zen.lnk"));
+  ok("scene row shows the hint, not a fix", report.includes("create this scene in PowerToys Workspaces"));
+  const meta = await page.$eval(".answer__meta", (e) => e.textContent);
+  ok("report counts problems in the meta line", meta.includes("2 problems"), meta);
+  ok("meta offers F for the one fixable path", meta.includes("F fixes 1 path"), meta);
   await page.keyboard.press("Enter"); await page.waitForTimeout(100);
   ok("Enter copies the report via set_clipboard", ((await last("set_clipboard"))?.text || "").includes("✗ tile Zen"));
   await page.keyboard.press("Escape"); await page.waitForTimeout(50);
@@ -193,6 +206,18 @@ window.__TAURI__ = { core: { invoke: async (cmd, args) => { window.__calls.push(
   await page.evaluate(() => window.__fayFocus(5, "start"));
   ok("__fayFocus starts a 5-minute timer", (await page.$eval("#timer", (e) => e.textContent)).includes("5 5:00") || (await page.$eval("#timer", (e) => e.textContent)).includes("4:59"));
   await page.evaluate(() => window.__fayFocus(0, "stop"));
+
+  // ---- doctor "F" writes the found paths back (last: it reloads the page) ----
+  await reset();
+  await page.click(".tile--k-doctor"); await page.waitForTimeout(300);
+  await page.keyboard.press("f"); await page.waitForTimeout(150);
+  const saved = (await last("save_config"))?.text || "";
+  const savedCfg = saved ? JSON.parse(saved) : {};
+  const savedZen = (savedCfg.apps || []).find((t) => t.id === "zen");
+  ok("F saves the config with the found path", savedZen?.target === "C:\\Start Menu\\Zen.lnk", savedZen?.target);
+  ok("F leaves other app tiles alone", ((savedCfg.apps || []).find((t) => t.id === "discord")?.target || "").includes("Discord.lnk"));
+  ok("F never rewrites a scene target", ((savedCfg.scenes || []).find((t) => t.id === "focus")?.target || "").includes("Fay-Focus.lnk"));
+  ok("F reports what it fixed", (await status()).includes("Zen"), await status());
 
   ok("no page errors during flows", errors.length === 0, errors.join(" | "));
   await browser.close(); server.close();

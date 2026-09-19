@@ -53,7 +53,8 @@ list_bookmarks(refresh?)  // Zen/Firefox jsonlz4 backups + Chromium Bookmarks JS
 voice_config(on, rate, name) / say(text) / listen() / set_voice_grammar(phrases)
 ai_config(provider, model, apiKey, ollamaUrl) / ai_ask(system, messages, withScreen) / capture_screen()
 pick_file()               // WinForms OpenFileDialog (STA PowerShell) for "+ Add app"
-doctor(targets, es)       // self-check rows: config path, each tile target (exists / on PATH / missing), tools, clipboard, bookmarks, voice host, AI
+doctor(targets, es)       // self-check rows: config path, each tile target (exists / on PATH / missing), tools, clipboard, bookmarks, voice host, AI.
+                          // A missing target with `find: true` triggers a Start-Menu-then-install-roots search; the row carries `fix` + `tileId` so the frontend can rewrite the config.
 ```
 
 **AI** (`app.js` owns the brain, Rust only does HTTP): the system prompt

@@ -456,3 +456,39 @@ Lesson recorded as a rule: a body state class must never share a name with
 a component class; and any new panel gets a painted-on-screen check, since
 DOM-only assertions passed for four rounds while nothing was visible. This
 alone justifies v0.2.2 — v0.2.1 ships the bug.
+
+### 2026-09-19 — Phase 28: Doctor repairs paths; first real Windows run
+The owner installed v0.2.2 and pasted the Doctor report — the first evidence
+from real hardware. It confirms the Windows-only paths that no CI could
+reach: the app installs and runs, the config seeds and validates clean,
+`%VAR%` expansion and `where.exe` lookups resolve, protocol targets classify,
+the **voice host is running** (`System.Speech` process alive), the clipboard
+watcher is armed, **1088 bookmarks** parsed across browsers (so both the
+mozlz4 and Chromium readers work on real profiles), PowerToys is detected,
+and Enter-copies-report works (the paste proves it).
+
+Every ✗ was configuration, not code: three scene shortcuts not yet created,
+Zen / Claude / LifeOS pointing at guessed paths, no SoundVolumeView, no
+`es.exe`, no AI key. That shape of failure is the product's real onboarding
+cost, so Doctor now **fixes** instead of only reporting. A missing app tile
+triggers a search — Start Menu shortcuts first (they carry the working
+directory and survive updates, which is why the Discord tile resolved while
+the guessed `.exe` paths did not), then `LOCALAPPDATA\Programs`, Program
+Files and Program Files (x86) — depth- and entry-budgeted so it cannot run
+away. Rows that find something carry `fix` + `tileId`, and **F** writes them
+into the user's config and reloads.
+
+Scene tiles are deliberately excluded from the search: their target is a
+PowerToys Workspace shortcut the owner creates, so a same-named app found
+elsewhere would be the wrong file and F would silently break the scene. They
+get a "create this in PowerToys Workspaces" hint instead. Only tiles present
+in the user's own config file are patchable — a pack or commands-folder tile
+has nothing to write back to.
+
+The report also exposed a real efficiency bug: with no NVIDIA card,
+`nvidia-smi` was spawned every 2.5 s forever by the stats poll. A failed
+*spawn* now latches "not installed" for the run; a non-zero exit stays
+retryable, since the driver may just be busy. AMD/Intel GPU readouts remain
+blank — sampling those needs Windows performance counters, which are too slow
+for this poll and would need the persistent-PowerShell treatment the voice
+host uses. Parked, not forgotten.

@@ -2,21 +2,20 @@
 
 > Update this at the end of every session. New chats read this first.
 
-**Last updated:** 2026-09-18
-**Current phase:** **Phases 1–27 merged; v0.2.2 released.** The "do them
-all" run shipped six batches (PRs #18–#22), then rendered debug rounds fixed
-the Heart's scale, the `@` teardown clash and — in round 6 — results mode
-being invisible (v0.2.1 ships that bug). Three automated test layers run in
-CI (frontend flows, backend contract, Rust unit). **None of it has been run by
-a human yet** — the next thing that matters is the owner installing v0.2.2,
-pressing the **Doctor** tile and pasting its report (Enter copies it). Next
-candidate features (owner-ranked "viral four"): wake word, now-playing on the
-Heart, AI memory, screen text grab — see the end of this file.
-**v0.2.2 is the release to install** (Phases 1–27); v0.2.1 hides every results
-panel, v0.2.0 predates the Heart fixes. (The v0.2.0
-page also carries a stale `Fay_0.1.0_x64-setup.exe` picked up from the CI
-cache — harmless, delete it from the release's edit page if it bothers you;
-the workflows now clear old bundles before building.)
+**Last updated:** 2026-09-19
+**Current phase:** **Phases 1–28 merged; v0.2.3 released.** Fay has now been
+**run on real Windows hardware** for the first time: the owner installed
+v0.2.2 and pasted the Doctor report. Everything CI could never reach works —
+install, config seeding + validation, `%VAR%` expansion, `where.exe` lookups,
+protocol targets, the voice host process, the clipboard watcher, 1088
+bookmarks parsed across browsers, PowerToys detection, Enter-copies-report.
+Every failure was configuration, not code. Phase 28 turns Doctor into a
+repair tool (**F** finds where apps really live and writes the paths back) and
+stops the doomed `nvidia-smi` spawn on non-NVIDIA machines.
+
+**v0.2.3 is the release to install.** Next candidate features (owner-ranked
+"viral four"): wake word, now-playing on the Heart, AI memory, screen text
+grab — see the end of this file.
 
 ## ✅ Done (all merged)
 
@@ -51,6 +50,7 @@ the workflows now clear old bundles before building.)
 | 25 | **Debug round 4 / frontend flow tests** — `docs/test-frontend.js` (34 checks in headless Chromium) runs in CI's `config` job; its first run found and fixed `@` being eaten by the Shift+digit teardown → teardown is now **Ctrl+digit**, digit shortcuts key off `e.key` |
 | 26 | **Debug round 5 / contract + unit tests** — `docs/test-backend-contract.js` (40 checks against a fake Tauri bridge: startup calls, bindings, exact `fire` payloads, clipboard/file/bookmark flows, AI plan → multi, destructive gate) and a `cargo test` module for the Rust helpers; both in CI |
 | 27 | **Doctor tile + full config validation + debug round 6** — `kind: "doctor"` → `doctor` command (tile targets exist / on PATH, tools, voice host, AI, clipboard, bookmarks) rendered as a report, Enter copies it; `validateConfig` checks the whole `app` block and flags unknown keys anywhere with *did you mean*; rendering the panel exposed that **results mode hid the whole body** since Phase 20 (body class `results` matched `.results { display:none }`) → `in-results`, painted-on-screen assertions in both suites; v0.2.2 |
+| 28 | **Doctor repairs paths + first real Windows run** — missing app tiles trigger a Start-Menu-then-install-roots search (depth/entry budgeted); rows carry `fix` + `tileId` and **F** writes them into the config and reloads. Scenes are never searched (their target is a PowerToys shortcut the owner makes). `nvidia-smi` spawn latches off when absent, instead of retrying every 2.5 s forever |
 
 ## ⚙️ CI (`.github/workflows/ci.yml`)
 
@@ -58,29 +58,38 @@ the workflows now clear old bundles before building.)
   suites: `docs/test-frontend.js` (flows, preview mode) and
   `docs/test-backend-contract.js` (fake Tauri bridge, exact payloads). Both
   assert panels are *painted*, not just present.
-- **build-check** (Windows) — `cargo check` + `cargo test` (pure helpers, `check_target`).
+- **build-check** (Windows) — `cargo check` + `cargo test` (pure helpers,
+  `check_target`, the app-name matcher and the budgeted directory walk).
 - **installer** (Windows) — `tauri build --bundles nsis` → uploads
   `Fay-windows-installer` artifact on every push/PR. Download it from the
   Actions run → no toolchain needed to test.
 
+## ✅ Verified on real hardware (Doctor report, 2026-09-19, v0.2.2)
+
+Install · config seeding + clean validation · `%VAR%` expansion · `where.exe`
+lookups · protocol target classification · **voice host process running** ·
+clipboard watcher armed · **1088 bookmarks** parsed (mozlz4 + Chromium, real
+profiles) · PowerToys detected · Doctor report + Enter-copies-report.
+Machine has no NVIDIA card, so GPU readouts stay blank by design.
+
 ## 📌 Pending — owner tasks (can't be automated)
 
-- [ ] **Run Fay** — install **v0.2.2 from the Releases page** (or any newer CI
-      artifact), press `Ctrl+Alt+Space`, then the **Doctor** tile, press
-      **Enter** (copies the report) and paste it into the chat. That one
-      paste answers most of the items below. Then feedback on the Heart —
-      density, pulse, backdrop dimness, ball size — and whether Ctrl+Mouse5 works.
-- [ ] Verify the exe paths for **Zen / Claude / LifeOS** — edit via tray › *Open
-      config file* (`%APPDATA%\com.fay.hub\apps.config.json`), then *Reload config*.
+- [ ] **Install v0.2.3**, open Doctor and press **F** — it should find Zen and
+      Claude by themselves and rewrite the paths. Then paste the new report.
 - [ ] Create the three **PowerToys Workspaces** + desktop shortcuts
-      (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`). See SETUP.md.
+      (`Fay-Focus.lnk`, `Fay-Game.lnk`, `Fay-Side.lnk`). See SETUP.md. These
+      are the only paths F can't repair (Fay must not guess them).
+- [ ] Say what **LifeOS** actually is (exe path or web URL) so its tile works.
 - [ ] Install **SoundVolumeView.exe** (PATH or beside Fay) for scene `audioOut`.
 - [ ] Install **Everything** + its `es.exe` CLI (PATH, or `app.everything`) for `>` file search.
-- [ ] Try voice: press `Ctrl+Alt+L`, say *"game"*. If the mic isn't picked up, check Windows › Privacy › Microphone.
+- [ ] Try voice: press `Ctrl+Alt+L`, say *"game"*. The host process is confirmed
+      running; what's untested is whether the mic reaches it. If not, check
+      Windows › Privacy › Microphone.
 - [ ] For AI: put your Anthropic key in `app.ai.apiKey` in the **local** config (tray › Open config file), or run Ollama and set `"provider": "ollama"`. Then type *"game mode but keep audio on speakers"* and press Enter; try `Ctrl+Alt+A` on an error dialog.
 - [ ] Decide on code signing (#20): a certificate costs money; without it SmartScreen shows "More info → Run anyway" once per install.
-- [ ] Runtime checks: tray appears, Ctrl+Alt+Space toggles, a UAC tile prompts,
-      footer shows real monitor count, accent matches Windows.
+- [ ] Still unproven by any run: **launching** a tile, scene audio switching,
+      snippet paste, toasts, screen capture, Everything search, the AI round
+      trip, Ctrl+Mouse5 summon, and Heart feedback (density, pulse, backdrop).
 
 ## 🚀 Pipeline — the "do them all" queue
 
@@ -145,8 +154,10 @@ window snapping (PowerToys does it), always-on screen capture (Cluely-style).
 | G | Translator | a prompt route through the AI bar | S |
 | H | Heart moods | per-scene tint/pace via `Heart.setMood()` | S |
 
-Parked: full "computer use", audio-reactive visuals (WASAPI loopback), phone
-companion. Recommended first: A + B + C + D, **after** the owner has run
+Also parked: AMD/Intel GPU readouts (needs Windows performance counters via a
+persistent PowerShell host, like the voice process — too slow to spawn per
+poll). Parked: full "computer use", audio-reactive visuals (WASAPI loopback),
+phone companion. Recommended first: A + B + C + D, **after** the owner has run
 v0.2.1 once.
 
 ## 🧭 Later / parked
